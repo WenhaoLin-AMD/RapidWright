@@ -29,6 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xilinx.fpga24_routing_contest.CheckPhysNetlist;
+import com.xilinx.fpga24_routing_contest.DcpToFPGAIF;
+import com.xilinx.fpga24_routing_contest.PartialRouterPhysNetlist;
 import com.xilinx.rapidwright.debug.DesignInstrumentor;
 import com.xilinx.rapidwright.debug.ILAInserter;
 import com.xilinx.rapidwright.debug.ProbeRouter;
@@ -193,6 +196,11 @@ public class MainEntrypoint {
         addFunction("TileColumnPattern", TileColumnPattern::main);
         addFunction("Unzip", Unzip::main);
         addFunction("UpdateRoutingUsingSATRouter", UpdateRoutingUsingSATRouter::main);
+
+        addFunction("LogicalNetlistToEdif", LogicalNetlistToEdif::main);
+        addFunction("CheckPhysNetlist", CheckPhysNetlist::main);
+        addFunction("DcpToFPGAIF", DcpToFPGAIF::main);
+        addFunction("PartialRouterPhysNetlist", PartialRouterPhysNetlist::main);
     }
 
     private static void listModes(PrintStream ps) {
