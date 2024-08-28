@@ -214,6 +214,14 @@ public class RWRoute {
         DesignTools.makePhysNetNamesConsistent(design);
         // DesignTools.createPossiblePinsToStaticNets(design);
         // DesignTools.createMissingSitePinInsts(design);
+
+        // Temporarily fix -> 
+        for (Net net: design.getNets()) {
+            if (!net.isClockNet() && !net.isStaticNet()) {
+                net.unroute();
+            }
+        }
+        // Temporarily fix <-
     }
 
     protected void preprocess() {
