@@ -329,7 +329,8 @@ public class RWRoute {
         staticNetAndRoutingTargets = new HashMap<>();
 
         for (Net net : design.getNets()) {
-            if (net.isClockNet()) {
+            String netName = net.getName();
+            if (net.isClockNet() || netName.equals("clk_BUFG") || netName.equals("clock_gen/rst")) {
                 addGlobalClkRoutingTargets(net);
 
             } else if (net.isStaticNet()) {
