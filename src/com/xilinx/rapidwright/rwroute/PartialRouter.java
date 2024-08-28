@@ -465,6 +465,9 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
+        // Temp fix ->
+        staticNet.unroute();
+        // Temp fix <-
         preserveNet(staticNet, true);
         if (staticNet.hasPIPs()) {
             numPreservedStaticNets++;
