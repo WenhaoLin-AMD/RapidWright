@@ -12,3 +12,13 @@
 /designs/
 interchange/schema/capnp/java.capnp
 *.orig
+
+# folder
+.vscode/
+log/
+tmplog/
+run/
+ps_scripts/
+
+# file/soft link
+dataset
