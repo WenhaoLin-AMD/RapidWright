@@ -206,14 +206,14 @@ public class RWRoute {
      */
     public static void preprocess(Design design) {
         Series series = design.getPart().getSeries();
-        if (!SUPPORTED_SERIES.contains(series)) {
-            throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
-        }
+        // if (!SUPPORTED_SERIES.contains(series)) {
+        //     throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
+        // }
 
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
-        DesignTools.createMissingSitePinInsts(design);
+        // DesignTools.createPossiblePinsToStaticNets(design);
+        // DesignTools.createMissingSitePinInsts(design);
     }
 
     protected void preprocess() {
