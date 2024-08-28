@@ -128,7 +128,7 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        int watchdog = 5;
+        int watchdog = 20;
 
         // Starting from the SPI's connected node, for each node in queue
         // return the first downhill node that is in an Interconnect tile.
