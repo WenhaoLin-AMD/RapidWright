@@ -769,16 +769,16 @@ public class RWRoute {
         routerTimer.createRuntimeTracker("Routing", routerTimer.getRootRuntimeTracker()).start();
         MessageGenerator.printHeader("Route Design");
 
-        routerTimer.createRuntimeTracker("route clock", "Routing").start();
-        routeGlobalClkNets();
-        routerTimer.getRuntimeTracker("route clock").stop();
+        // routerTimer.createRuntimeTracker("route clock", "Routing").start();
+        // routeGlobalClkNets();
+        // routerTimer.getRuntimeTracker("route clock").stop();
 
-        routerTimer.createRuntimeTracker("route static nets", "Routing").start();
-        // Routes static nets (VCC and GND) before signals for now.
-        // All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
-        routeStaticNets();
-        // Connection-based router for indirectly connected pairs of output pin and input pin */
-        routerTimer.getRuntimeTracker("route static nets").stop();
+        // routerTimer.createRuntimeTracker("route static nets", "Routing").start();
+        // // Routes static nets (VCC and GND) before signals for now.
+        // // All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
+        // routeStaticNets();
+        // // Connection-based router for indirectly connected pairs of output pin and input pin */
+        // routerTimer.getRuntimeTracker("route static nets").stop();
 
         RuntimeTracker routeWireNets = routerTimer.createRuntimeTracker("route wire nets", "Routing");
         routeWireNets.start();
