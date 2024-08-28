@@ -370,7 +370,7 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        allowedTileEnums = EnumSet.of(TileTypeEnum.INT);
+        allowedTileEnums = EnumSet.of(TileTypeEnum.INT, TileTypeEnum.CLE_BC_CORE);
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
     }
 

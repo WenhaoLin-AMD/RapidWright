@@ -172,7 +172,8 @@ public class RouterHelper {
         int watchdog = 1000;
         while (!q.isEmpty()) {
             LightweightRouteNode n = q.poll();
-            if (n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            TileTypeEnum tileType = n.getNode().getTile().getTileTypeEnum();
+            if (tileType == TileTypeEnum.INT || tileType == TileTypeEnum.CLE_BC_CORE) {
                 while (n != null) {
                     sinkToSwitchBoxPath.add(n.getNode());
                     n = n.getPrev();
