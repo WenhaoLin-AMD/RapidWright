@@ -28,6 +28,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -217,7 +218,7 @@ public class RWRoute {
 
         // Temporarily fix -> 
         for (Net net: design.getNets()) {
-            if (!net.isClockNet() && !net.isStaticNet()) {
+            if (!NetTools.isClockNet(net) && !net.isStaticNet()) {
                 net.unroute();
             }
         }
@@ -337,8 +338,7 @@ public class RWRoute {
         staticNetAndRoutingTargets = new HashMap<>();
 
         for (Net net : design.getNets()) {
-            String netName = net.getName();
-            if (net.isClockNet() || netName.equals("clk_BUFG") || netName.equals("clock_gen/rst")) {
+            if (NetTools.isClockNet(net)) {
                 addGlobalClkRoutingTargets(net);
 
             } else if (net.isStaticNet()) {
