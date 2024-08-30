@@ -206,6 +206,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_CLE_BNODE:
                     case NODE_CLE_CNODE:
                     case NODE_CLE_CTRL:
+                    case NODE_INTF_BNODE:
+                    case NODE_INTF_CNODE:
+                    case NODE_INTF_CTRL:
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
