@@ -44,9 +44,16 @@ fi
 # If the first argument is likely to be a class name, then
 # execute that Java class' `main()` method
 if case $1 in "com.xilinx.rapidwright."*) true;; *) false;; esac; then
-    java -cp ${MAIN_JAR} "$@"
+    # java -cp ${MAIN_JAR} "$@"
+    command="java -ea -cp ${MAIN_JAR} $@"
+    echo $command
+    eval $command
     exit
 fi
 
 # Otherwise use the default `MainEntrypoint` class
-java -jar ${MAIN_JAR} "$@"
+# java -jar ${MAIN_JAR} "$@"
+command="java -ea -jar ${MAIN_JAR} $@"
+echo $command
+eval $command
+
