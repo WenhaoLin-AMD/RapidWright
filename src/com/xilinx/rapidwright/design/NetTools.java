@@ -24,17 +24,34 @@ package com.xilinx.rapidwright.design;
 
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.device.Series;
+
 public class NetTools {
-    private static HashSet<String> clkNetNamesInVersal;
+    private static HashSet<String> clkSourceNamesOfUS = new HashSet<>();
     static {
-        clkNetNamesInVersal = new HashSet<>();
-        // corescore_500
-        clkNetNamesInVersal.add("clk_BUFG");
-        clkNetNamesInVersal.add("clock_gen/rst");
-        // boom_med_pb
-        clkNetNamesInVersal.add("clock_uncore_clock");
+        clkSourceNamesOfUS.add("CLK_OUT");
+        clkSourceNamesOfUS.add("CLKOUT");
+        clkSourceNamesOfUS.add("CLKFBOUT");
     }
+    private static HashSet<String> clkSourceNamesOfVersal = new HashSet<>();
+    static {
+        clkSourceNamesOfVersal.add("O");
+    }
+    
     public static boolean isClockNet(Net net) {
-        return net.isClockNet() || clkNetNamesInVersal.contains(net.getName());
+        SitePinInst source = net.getSource();
+        if (source == null)
+            return false;
+
+        String sourceName = source.getName();
+        Series series = net.getDesign().getDevice().getSeries();
+        if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+            return clkSourceNamesOfUS.contains(sourceName);
+        }
+        if (series == Series.Versal) {
+            return clkSourceNamesOfVersal.contains(sourceName);
+        }
+        // fallback
+        return net.isClockNet();
     }
 }
