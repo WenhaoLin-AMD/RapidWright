@@ -147,6 +147,7 @@ public class RouteNodeGraph {
         // Device.getArbitraryTileOfType() typically gives you the North-Western-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
+        Series series = device.getSeries();
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -172,7 +173,8 @@ public class RouteNodeGraph {
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
+                assert(((series == Series.UltraScale || series == Series.UltraScalePlus) && baseNode.getIntentCode() == IntentCode.NODE_LOCAL) ||
+                        (series == Series.Versal                                         && baseNode.getIntentCode() == IntentCode.NODE_INODE));
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWireIndex());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
