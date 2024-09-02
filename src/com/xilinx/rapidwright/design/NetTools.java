@@ -39,19 +39,25 @@ public class NetTools {
     }
     
     public static boolean isClockNet(Net net) {
+        Series series = net.getDesign().getDevice().getSeries();
         SitePinInst source = net.getSource();
         if (source == null)
-            return false;
-
+            return false;        
         String sourceName = source.getName();
-        Series series = net.getDesign().getDevice().getSeries();
+        
         if (series == Series.UltraScale || series == Series.UltraScalePlus) {
             return clkSourceNamesOfUS.contains(sourceName);
         }
         if (series == Series.Versal) {
-            return clkSourceNamesOfVersal.contains(sourceName);
+            String tileName = source.getTile().getName();
+            String siteName = source.getSite().toString();
+            return tileName.startsWith("CLK") && siteName.startsWith("BUF") && clkSourceNamesOfVersal.contains(sourceName);
         }
         // fallback
         return net.isClockNet();
+    }
+
+    public static boolean isGlobalNet(Net net) {
+        return net.isStaticNet() || isClockNet(net);
     }
 }
