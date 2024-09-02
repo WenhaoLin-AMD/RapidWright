@@ -17,6 +17,7 @@ public class TestNetTools {
     @Test
     public void testIsClockNet() {
         // two global nets in corescore_500 design reported by Vivado
+        // command: select_objects [get_nets -filter {Type == "GLOBAL_CLOCK"}]
         HashSet<String> clkNetNames = new HashSet<>(List.of(
             "clk_BUFG", 
             "clock_gen/rst"
