@@ -25,33 +25,35 @@ package com.xilinx.rapidwright.design;
 import java.util.HashSet;
 
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 public class NetTools {
-    private static HashSet<String> clkSourceNamesOfUS = new HashSet<>();
+    private static HashSet<String> clkSrcSpiNamesOfUS = new HashSet<>();
     static {
-        clkSourceNamesOfUS.add("CLK_OUT");
-        clkSourceNamesOfUS.add("CLKOUT");
-        clkSourceNamesOfUS.add("CLKFBOUT");
+        clkSrcSpiNamesOfUS.add("CLK_OUT");
+        clkSrcSpiNamesOfUS.add("CLKOUT");
+        clkSrcSpiNamesOfUS.add("CLKFBOUT");
     }
-    private static HashSet<String> clkSourceNamesOfVersal = new HashSet<>();
+
+    private static HashSet<SiteTypeEnum> clkSrcSiteTypeEnumsOfVersal = new HashSet<>();
     static {
-        clkSourceNamesOfVersal.add("O");
+        clkSrcSiteTypeEnumsOfVersal.add(SiteTypeEnum.BUFGCE);
+        clkSrcSiteTypeEnumsOfVersal.add(SiteTypeEnum.BUFG_FABRIC);
     }
-    
+
     public static boolean isClockNet(Net net) {
         Series series = net.getDesign().getDevice().getSeries();
-        SitePinInst source = net.getSource();
-        if (source == null)
+        SitePinInst srcSpi = net.getSource();
+        if (srcSpi == null)
             return false;        
-        String sourceName = source.getName();
+        String srcSpiName = srcSpi.getName();
         
         if (series == Series.UltraScale || series == Series.UltraScalePlus) {
-            return clkSourceNamesOfUS.contains(sourceName);
+            return clkSrcSpiNamesOfUS.contains(srcSpiName);
         }
+
         if (series == Series.Versal) {
-            String tileName = source.getTile().getName();
-            String siteName = source.getSite().toString();
-            return tileName.startsWith("CLK") && siteName.startsWith("BUF") && clkSourceNamesOfVersal.contains(sourceName);
+            return clkSrcSiteTypeEnumsOfVersal.contains(srcSpi.getSiteTypeEnum());
         }
         // fallback
         return net.isClockNet();
