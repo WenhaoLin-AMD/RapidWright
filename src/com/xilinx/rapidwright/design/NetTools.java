@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design;
 
 import java.util.HashSet;
+import java.util.List;
 
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -37,8 +38,14 @@ public class NetTools {
 
     private static HashSet<SiteTypeEnum> clkSrcSiteTypeEnumsOfVersal = new HashSet<>();
     static {
-        clkSrcSiteTypeEnumsOfVersal.add(SiteTypeEnum.BUFGCE);
-        clkSrcSiteTypeEnumsOfVersal.add(SiteTypeEnum.BUFG_FABRIC);
+        clkSrcSiteTypeEnumsOfVersal.addAll(List.of(
+            SiteTypeEnum.BUFGCE,
+            SiteTypeEnum.BUFG_FABRIC,
+            SiteTypeEnum.BUFGCE_DIV,
+            SiteTypeEnum.BUFGCTRL,
+            SiteTypeEnum.BUFG_GT,
+            SiteTypeEnum.BUFG_PS
+        ));
     }
 
     public static boolean isClockNet(Net net) {
