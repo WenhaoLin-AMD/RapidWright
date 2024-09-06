@@ -1,11 +1,8 @@
-package com.xilinx.rapidwright.rwroute;
+package com.xilinx.rapidwright.design;
 
 import java.util.HashSet;
 import java.util.List;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 import org.junit.jupiter.api.Assertions;
