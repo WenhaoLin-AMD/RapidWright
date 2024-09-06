@@ -17,7 +17,9 @@ public class TestNetTools {
         // command: select_objects [get_nets -filter {Type == "GLOBAL_CLOCK"}]
         HashSet<String> clkNetNamesFromVivado = new HashSet<>(List.of(
             "clk1_IBUF_BUFG",
-            "clk2_IBUF_BUFG"
+            "clk2_IBUF_BUFG",
+            "rst1",
+            "rst2"
         ));
 
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
