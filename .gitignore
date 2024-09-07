@@ -19,6 +19,7 @@ log/
 tmplog/
 run/
 ps_scripts/
+output/
 
 # file/soft link
 dataset
