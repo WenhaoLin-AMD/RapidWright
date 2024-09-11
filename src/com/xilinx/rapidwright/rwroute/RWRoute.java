@@ -218,7 +218,8 @@ public class RWRoute {
 
         // Temporarily fix -> 
         for (Net net: design.getNets()) {
-            if (!NetTools.isClockNet(net) && !net.isStaticNet()) {
+            // if (!NetTools.isClockNet(net) && !net.isStaticNet()) {
+            if (!NetTools.isClockNet(net)) {
                 net.unroute();
             }
         }
@@ -782,12 +783,14 @@ public class RWRoute {
         // routeGlobalClkNets();
         // routerTimer.getRuntimeTracker("route clock").stop();
 
-        // routerTimer.createRuntimeTracker("route static nets", "Routing").start();
-        // // Routes static nets (VCC and GND) before signals for now.
-        // // All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
-        // routeStaticNets();
-        // // Connection-based router for indirectly connected pairs of output pin and input pin */
-        // routerTimer.getRuntimeTracker("route static nets").stop();
+        routerTimer.createRuntimeTracker("route static nets", "Routing").start();
+        // Routes static nets (VCC and GND) before signals for now.
+        // All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
+        routeStaticNets();
+        // Connection-based router for indirectly connected pairs of output pin and input pin */
+        routerTimer.getRuntimeTracker("route static nets").stop();
+
+        System.exit(0);
 
         RuntimeTracker routeWireNets = routerTimer.createRuntimeTracker("route wire nets", "Routing");
         routeWireNets.start();

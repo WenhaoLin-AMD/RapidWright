@@ -344,7 +344,7 @@ public class GlobalSignalRouting {
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
-            int watchdog = 10000;
+            int watchdog = 100000;
             if (debug) {
                 System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
             }
@@ -402,7 +402,7 @@ public class GlobalSignalRouting {
                     System.out.println("KEEP LOOKING FOR A SOURCE...");
                 }
                 for (Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
-                    if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
+                    if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode()) && routingNode.getNode().getIntentCode() != IntentCode.NODE_IRI) continue;
                     LightweightRouteNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
                     if (!pruneNode(nParent, getNodeState, visitedRoutingNodes, usedRoutingNodes)) {
                         nParent.setPrev(routingNode);
