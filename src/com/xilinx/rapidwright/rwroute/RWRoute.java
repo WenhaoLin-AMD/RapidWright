@@ -199,6 +199,30 @@ public class RWRoute {
                 + "supported series: " + SUPPORTED_SERIES;
     }
 
+    private static void printPathToSink(Net net, SitePinInst sink) {
+        List<Node> path = new ArrayList<>();
+        HashSet<Node> usedNodes = new HashSet<>();
+        for (PIP pip: net.getPIPs()) {
+            usedNodes.add(pip.getStartNode());
+            usedNodes.add(pip.getEndNode());
+        }
+        Node currNode = sink.getConnectedNode();
+        while (currNode != null) {
+            path.add(currNode);
+            List<Node> uphills = currNode.getAllUphillNodes();
+            currNode = null;
+            for (Node uphill: uphills) {
+                if (uphill != null && usedNodes.contains(uphill)) {
+                    currNode = uphill;
+                    break;
+                }
+            }
+        }
+        for (Node node: path) {
+            System.out.println(node);
+        }
+    }
+
     /**
      * Pre-process the design to ensure that only the physical {@link Net}-s corresponding to
      * the parent logical {@link EDIFHierNet} exists, and that such {@link Net}-s contain
@@ -213,8 +237,19 @@ public class RWRoute {
 
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
-        // DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
         // DesignTools.createMissingSitePinInsts(design);
+
+        // print
+        for (Net net: design.getNets()) {
+            if (net.isGNDNet()) {
+                for (SitePinInst sink: net.getSinkPins()) {
+                    if (sink.toString().equals("IN DSP_X4Y143.CEALUMODE")) {
+                        printPathToSink(net, sink);
+                    }
+                }
+            }
+        }
 
         // Temporarily fix -> 
         for (Net net: design.getNets()) {

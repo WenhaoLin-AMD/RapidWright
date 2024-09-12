@@ -24,6 +24,17 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Function;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
@@ -38,23 +49,13 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-import java.util.function.Function;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
@@ -349,7 +350,7 @@ public class GlobalSignalRouting {
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
-            int watchdog = 10000;
+            int watchdog = 50000;
             if (debug) {
                 System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
             }
@@ -407,7 +408,11 @@ public class GlobalSignalRouting {
                     System.out.println("KEEP LOOKING FOR A SOURCE...");
                 }
                 for (Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
-                    if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode()) && routingNode.getNode().getIntentCode() != IntentCode.NODE_IRI) continue;
+                    boolean shouldSkipThisRouteThru = routeThruHelper.isRouteThru(uphillNode, routingNode.getNode()) && 
+                                                      routingNode.getNode().getIntentCode() != IntentCode.NODE_IRI &&
+                                                      routingNode.getNode().getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE &&
+                                                      routingNode.getNode().getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE_MY;
+                    if (shouldSkipThisRouteThru) continue;
                     LightweightRouteNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
                     if (!pruneNode(nParent, getNodeState, visitedRoutingNodes, usedRoutingNodes)) {
                         nParent.setPrev(routingNode);
