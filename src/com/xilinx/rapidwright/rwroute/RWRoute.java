@@ -790,8 +790,6 @@ public class RWRoute {
         // Connection-based router for indirectly connected pairs of output pin and input pin */
         routerTimer.getRuntimeTracker("route static nets").stop();
 
-        System.exit(0);
-
         RuntimeTracker routeWireNets = routerTimer.createRuntimeTracker("route wire nets", "Routing");
         routeWireNets.start();
         preRoutingEstimation();

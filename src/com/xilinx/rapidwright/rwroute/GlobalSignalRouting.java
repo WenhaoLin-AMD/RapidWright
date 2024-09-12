@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
@@ -67,6 +68,10 @@ public class GlobalSignalRouting {
             for (String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "MUX");
+                // Versal
+                for (int siteIndex = 0; siteIndex < 2; siteIndex++) {
+                    lutOutputPinNames.add("CLE_SLICE" + cle + "_TOP_" + siteIndex + "_" + pin + "_O_PIN");
+                }
             }
         }
     }
@@ -344,7 +349,7 @@ public class GlobalSignalRouting {
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
-            int watchdog = 100000;
+            int watchdog = 10000;
             if (debug) {
                 System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
             }
@@ -523,7 +528,9 @@ public class GlobalSignalRouting {
         }
         String wireName = node.getWireName();
         if (lutOutputPinNames.contains(wireName)) {
-            Site slice = node.getTile().getSites()[0];
+            boolean isVersal = design.getDevice().getSeries() == Series.Versal;
+            int siteIndex = isVersal ? wireName.charAt(wireName.length() - 9) - '0' : 0;
+            Site slice = node.getTile().getSites()[siteIndex];
             SiteInst si = design.getSiteInstFromSite(slice);
             if (si == null) {
                 // Site is not used
@@ -531,27 +538,30 @@ public class GlobalSignalRouting {
             }
 
             String sitePinName;
-            if (wireName.endsWith("_O")) {
-                sitePinName = wireName.substring(wireName.length() - 3);
-            } else if (wireName.endsWith("MUX")) {
-                char lutLetter = wireName.charAt(wireName.length() - 4);
-                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
-                if (o6Net != null && o6Net.getType() != type) {
-                    // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
-                    return false;
-                }
-
-                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
-                if (o5Net != null && o5Net.getType() != type) {
-                    // 5LUT is occupied
-                    return false;
-                }
-
-                sitePinName = wireName.substring(wireName.length() - 4);
+            if (isVersal) {
+                assert(wireName.endsWith("_O_PIN"));
+                sitePinName = wireName.substring(wireName.length() - 7, wireName.length() - 4);
             } else {
-                throw new RuntimeException(wireName);
-            }
+                if (wireName.endsWith("_O")) {
+                    sitePinName = wireName.substring(wireName.length() - 3);
+                } else if (wireName.endsWith("MUX")) {
+                    char lutLetter = wireName.charAt(wireName.length() - 4);
+                    Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
+                    if (o6Net != null && o6Net.getType() != type) {
+                        // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
+                        return false;
+                    }
+                    Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                    if (o5Net != null && o5Net.getType() != type) {
+                        // 5LUT is occupied
+                        return false;
+                    }
 
+                    sitePinName = wireName.substring(wireName.length() - 4);
+                } else {
+                    throw new RuntimeException(wireName);
+                }
+            }
             Net sitePinNet = si.getNetFromSiteWire(sitePinName);
             return sitePinNet == null || sitePinNet.getType() == type;
         }
