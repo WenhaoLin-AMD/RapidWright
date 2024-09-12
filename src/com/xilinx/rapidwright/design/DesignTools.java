@@ -2095,7 +2095,7 @@ public class DesignTools {
             // Don't move cell if already placed
             return true;
         }
-        Map<SiteTypeEnum, Set<String>> compatTypes = c.getCompatiblePlacements();
+        Map<SiteTypeEnum, Set<String>> compatTypes = c.getCompatiblePlacements(design.getDevice());
 
         for (Entry<SiteTypeEnum, Set<String>> e : compatTypes.entrySet()) {
             for (Site s : design.getDevice().getAllSitesOfType(e.getKey())) {
@@ -3162,8 +3162,12 @@ public class DesignTools {
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
-        createA1A6ToStaticNets(design);
-        createCeClkOfRoutethruFFToVCC(design);
+        if (design.getSeries() == Series.Versal) {
+            // TODO
+        } else {
+            createA1A6ToStaticNets(design);
+            createCeClkOfRoutethruFFToVCC(design);
+        }
         createCeSrRstPinsToVCC(design);
     }
 
@@ -3171,10 +3175,16 @@ public class DesignTools {
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
         for (SiteInst si : design.getSiteInsts()) {
-            if (!Utils.isSLICE(si)) continue;
-            for (BEL bel : si.getBELs()) {
-                Cell cell = si.getCell(bel);
-                if (cell == null || !cell.isFFRoutethruCell()) {
+            if (!Utils.isSLICE(si)) {
+                continue;
+            }
+            for (Cell cell : si.getCells()) {
+                if (!cell.isFFRoutethruCell()) {
+                    continue;
+                }
+
+                BEL bel = cell.getBEL();
+                if (bel == null) {
                     continue;
                 }
 
@@ -3203,19 +3213,31 @@ public class DesignTools {
 
     public static void createA1A6ToStaticNets(Design design) {
         for (SiteInst si : design.getSiteInsts()) {
+            if (!Utils.isSLICE(si)) {
+                continue;
+            }
             for (Cell cell : si.getCells()) {
+                BEL bel = cell.getBEL();
+                if (bel == null || !bel.isLUT()) {
+                    continue;
+                }
+
                 // SKIPPING <LOCKED> LUTs to resolve site pin conflicts between GND and VCC
                 // Without skipping <LOCKED>, some A6 pins of SRL16E LUTs (5LUT and 6LUT used) will be handled twice in createMissingStaticSitePins().
                 // In the second processing, those A6 pins are somehow added to VCC while they should stay in GND.
-                if (cell.getName().contains("LOCKED")) continue;// Are there better ways to identify this problem?
-
-                BEL bel = cell.getBEL();
-                if (bel == null || !bel.isLUT()) continue;
-                if (bel.getName().contains("5LUT")) {
-                    bel = si.getBEL(bel.getName().replace("5", "6"));
+                if (cell.getName().equals(Cell.LOCKED)) {
+                    continue;
                 }
+
+                if (bel.getName().endsWith("5LUT")) {
+                    bel = si.getBEL(bel.getName().charAt(0) + "6LUT");
+                }
+
+                boolean isSRL = ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType()));
                 for (String belPinName : lut6BELPins) {
-                    if (belPinName.equals("A1") && !"SRL16E".equals(cell.getType()) && !"SRLC32E".equals(cell.getType())) continue;
+                    if (!isSRL && belPinName.equals("A1")) {
+                        continue;
+                    }
                     BELPin belPin = bel.getPin(belPinName);
                     if (belPin != null) {
                         createMissingStaticSitePins(belPin, si, cell);
@@ -3234,76 +3256,125 @@ public class DesignTools {
     public static void createCeSrRstPinsToVCC(Design design) {
         Series series = design.getDevice().getSeries();
         if (series == Series.Series7) {
-            // Nothing to be done for Series7 which don't have inverters
+            // Series7 have {CE,SR}USEDMUX which is used to supply VCC and GND respectively from
+            // inside the site, so no inter-site routing necessary
             return;
         }
-        Net vcc = design.getVccNet();
-        Net gndInvertibleToVcc = null;
-        // On these series of devices, SR can be inverted from gnd to vcc
-        if (EnumSet.of(Series.UltraScale, Series.UltraScalePlus).contains(series)) {
-            gndInvertibleToVcc = design.getGndNet();
-        }
         Map<String, Pair<String, String>> pinMapping = belTypeSitePinNameMapping.get(series);
-        final String[] pins = new String[] {"CE", "SR"};
-        for (Cell cell : design.getCells()) {
-            if (isUnisimFlipFlopType(cell.getType())) {
-                SiteInst si = cell.getSiteInst();
+        Net vccNet = design.getVccNet();
+        if (series == Series.Versal) {
+            // In Versal, sitewires for a SLICE's CE pins are not assigned to the VCC net
+            // Assume that the lack of sitewire for a placed FF indicates VCC
+            for (SiteInst si : design.getSiteInsts()) {
                 if (!Utils.isSLICE(si)) {
                     continue;
                 }
-                BEL bel = cell.getBEL();
-                Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
-                for (String pin : pins) {
-                    BELPin belPin = cell.getBEL().getPin(pin);
-                    Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (net == null || (net == gndInvertibleToVcc && pin.equals("SR"))) {
-                        String sitePinName;
-                        if (pin.equals("CE")) { // CKEN
-                            sitePinName = sitePinNames.getFirst();
-                        } else { //SRST
-                            sitePinName = sitePinNames.getSecond();
-                        }
-                        if (si.getSitePinInst(sitePinName) == null) {
-                            vcc.createPin(sitePinName, si);
-                        }
+                for (Cell cell : si.getCells()) {
+                    BEL bel = cell.getBEL();
+                    if (bel == null || !bel.isFF()) {
+                        continue;
                     }
-                }
-            } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
-                //cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
-                SiteInst si = cell.getSiteInst();
-                String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
-                Net net = si.getNetFromSiteWire(siteWire);
-                if (net == null) {
-                    for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
-                        if (si.getSitePinInst(pinName) == null) {
-                            vcc.createPin(pinName, si);
+
+                    if (!bel.getBELType().equals("FF")) {
+                        assert(bel.getBELType().matches("(SLICE_IMI|SLICE[LM]_IMC)_FF(_T)?"));
+                        continue;
+                    }
+
+                    Pair<String, String> sitePinNames = pinMapping.get(bel.getName());
+                    final String[] belPinNames = new String[] {"CE"}; // TODO: "SR"
+                    for (String belPinName : belPinNames) {
+                        String sitePinName = belPinName == belPinNames[0] ? sitePinNames.getFirst() : sitePinNames.getSecond();
+                        if (si.getSitePinInst(sitePinName) != null) {
+                            continue;
                         }
-                    }
-                }
-            } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
-                SiteInst si = cell.getSiteInst();
-                // type RAMB180: L_O, type RAMB181: U_O
-                // TODO Type should be consistent with getPrimarySiteTypeEnum()?
-                // System.out.println(cell.getAllPhysicalPinMappings("RSTREGB") + ", " + si + ", " + cell.getSiteWireNameFromLogicalPin("RSTREGB") + ", " + si.getPrimarySiteTypeEnum());
-                // [RSTREGB], SiteInst(name="RAMB18_X5Y64", type="RAMB180", site="RAMB18_X5Y64"), OPTINV_RSTREGB_L_O, RAMBFIFO18
-                // [RSTREGB], SiteInst(name="RAMB18_X5Y31", type="RAMB181", site="RAMB18_X5Y31"), OPTINV_RSTREGB_U_O, RAMB181
-                // null, SiteInst(name="RAMB18_X6Y43", type="RAMB181", site="RAMB18_X6Y43"), null, RAMB181
-                // null, SiteInst(name="RAMB18_X5Y22", type="RAMB180", site="RAMB18_X5Y22"), null, RAMBFIFO18
-                // The following workaround solves the RAMB18 RSTREGB pin issue
-                String siteWire = cell.getBEL().getPin("RSTREGB").getSiteWireName();
-                Net net = si.getNetFromSiteWire(siteWire);
-                if (net == null) {
-                    String pinName;
-                    if (siteWire.endsWith("L_O")) {
-                        pinName = "RSTREGBL";
-                    } else {
-                        pinName = "RSTREGBU";
-                    }
-                    if (si.getSitePinInst(pinName) == null) {
-                        vcc.createPin(pinName, si);
+
+                        Net net = si.getNetFromSiteWire(sitePinName);
+                        if (net != null) {
+                            // It is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
+                            assert(!net.isVCCNet());
+                            continue;
+                        }
+                        BELPin belPin = bel.getPin(belPinName);
+                        assert(si.getNetFromSiteWire(belPin.getSiteWireName()) == null);
+
+                        SitePinInst spi = new SitePinInst(false, sitePinName, si);
+                        boolean updateSiteRouting = false;
+                        vccNet.addPin(spi, updateSiteRouting);
                     }
                 }
             }
+        } else if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+            Net gndInvertibleToVcc = design.getGndNet();
+            final String[] pins = new String[] {"CE", "SR"};
+            for (Cell cell : design.getCells()) {
+                if (isUnisimFlipFlopType(cell.getType())) {
+                    SiteInst si = cell.getSiteInst();
+                    if (!Utils.isSLICE(si)) {
+                        continue;
+                    }
+                    BEL bel = cell.getBEL();
+                    Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
+                    for (String pin : pins) {
+                        BELPin belPin = cell.getBEL().getPin(pin);
+                        Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
+                        if (net == null || (net == gndInvertibleToVcc && pin.equals("SR"))) {
+                            String sitePinName;
+                            if (pin.equals("CE")) { // CKEN
+                                sitePinName = sitePinNames.getFirst();
+                            } else { //SRST
+                                sitePinName = sitePinNames.getSecond();
+                            }
+                            maybeCreateVccPinAndPossibleInversion(si, sitePinName, vccNet, gndInvertibleToVcc);
+                        }
+                    }
+                } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
+                    //cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
+                    SiteInst si = cell.getSiteInst();
+                    String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
+                    Net net = si.getNetFromSiteWire(siteWire);
+                    if (net == null) {
+                        for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
+                            maybeCreateVccPinAndPossibleInversion(si, pinName, vccNet, gndInvertibleToVcc);
+                        }
+                    }
+                } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
+                    SiteInst si = cell.getSiteInst();
+                    // type RAMB180: L_O, type RAMB181: U_O
+                    // TODO Type should be consistent with getPrimarySiteTypeEnum()?
+                    // System.out.println(cell.getAllPhysicalPinMappings("RSTREGB") + ", " + si + ", " + cell.getSiteWireNameFromLogicalPin("RSTREGB") + ", " + si.getPrimarySiteTypeEnum());
+                    // [RSTREGB], SiteInst(name="RAMB18_X5Y64", type="RAMB180", site="RAMB18_X5Y64"), OPTINV_RSTREGB_L_O, RAMBFIFO18
+                    // [RSTREGB], SiteInst(name="RAMB18_X5Y31", type="RAMB181", site="RAMB18_X5Y31"), OPTINV_RSTREGB_U_O, RAMB181
+                    // null, SiteInst(name="RAMB18_X6Y43", type="RAMB181", site="RAMB18_X6Y43"), null, RAMB181
+                    // null, SiteInst(name="RAMB18_X5Y22", type="RAMB180", site="RAMB18_X5Y22"), null, RAMBFIFO18
+                    // The following workaround solves the RAMB18 RSTREGB pin issue
+                    String siteWire = cell.getBEL().getPin("RSTREGB").getSiteWireName();
+                    Net net = si.getNetFromSiteWire(siteWire);
+                    if (net == null) {
+                        String pinName;
+                        if (siteWire.endsWith("L_O")) {
+                            pinName = "RSTREGBL";
+                        } else {
+                            pinName = "RSTREGBU";
+                        }
+                        maybeCreateVccPinAndPossibleInversion(si, pinName, vccNet, gndInvertibleToVcc);
+                    }
+                }
+            }
+        } else {
+            throw new RuntimeException("ERROR: Unsupported series: " + series);
+        }
+    }
+    
+    private static void maybeCreateVccPinAndPossibleInversion(SiteInst si, String sitePinName, Net vcc, Net gndInvertibleToVcc) {
+        SitePinInst sitePin = si.getSitePinInst(sitePinName);
+        if (sitePin == null) {
+            sitePin = vcc.createPin(sitePinName, si);
+        }
+        if (gndInvertibleToVcc != null) {
+            // For the RST inversion to be interpreted properly by Vivado, there must be no
+            // site routing on the path around the inverter BEL
+            BELPin belPin = sitePin.getBELPin();
+            si.unrouteIntraSiteNet(belPin, belPin);
         }
     }
 
@@ -3415,6 +3486,46 @@ public class DesignTools {
             ultraScale.put("FFF2", p);
             ultraScale.put("GFF2", p);
             ultraScale.put("HFF2", p);
+        }
+        {
+            Map<String, Pair<String, String>> series7 = new HashMap<>();
+            belTypeSitePinNameMapping.put(Series.Series7, series7);
+
+            p = new Pair<>("CE", "SR");
+            series7.put("AFF",  p);
+            series7.put("A5FF", p);
+            series7.put("BFF",  p);
+            series7.put("B5FF", p);
+            series7.put("CFF",  p);
+            series7.put("C5FF", p);
+            series7.put("DFF",  p);
+            series7.put("D5FF", p);
+        }
+        {
+            Map<String, Pair<String, String>> versal = new HashMap<>();
+            belTypeSitePinNameMapping.put(Series.Versal, versal);
+
+            p = new Pair<>("CKEN1", "RST");
+            versal.put("AFF",  p);
+            versal.put("AFF2", p);
+            versal.put("BFF",  p);
+            versal.put("BFF2", p);
+            p = new Pair<>("CKEN2", "RST");
+            versal.put("CFF",  p);
+            versal.put("CFF2", p);
+            versal.put("DFF",  p);
+            versal.put("DFF2", p);
+
+            p = new Pair<>("CKEN3", "RST");
+            versal.put("EFF",  p);
+            versal.put("EFF2", p);
+            versal.put("FFF",  p);
+            versal.put("FFF2", p);
+            p = new Pair<>("CKEN4", "RST");
+            versal.put("GFF",  p);
+            versal.put("GFF2", p);
+            versal.put("HFF",  p);
+            versal.put("HFF2", p);
         }
     }
 
@@ -4191,5 +4302,30 @@ public class DesignTools {
         for (Net net : design.getNets()) {
             updatePinsIsRouted(net);
         }
+    }
+
+    /**
+     * Removes all the existing encrypted cell files from a design and replaces them
+     * with the provided list and black boxes those cells. The provided files
+     * should be named after the cell type. This is useful in the scenarios where a
+     * design has many thousand of individual encrypted cell files that are time
+     * consuming to load. By providing a higher level of hierarchy cell definition,
+     * encompassing all existing encrypted cells, the number of individual 
+     * files to be loaded by Vivado can be reduced.
+     * 
+     * @param design   The design to modify.
+     * @param netlists The list of encrypted cell files (*.edn, *.edf, or *.dcp)
+     *                 that should be used instead.
+     */
+    public static void replaceEncryptedCells(Design design, List<Path> netlists) {
+        EDIFNetlist n = design.getNetlist();
+        for (Path p : netlists) {
+            String fileName = p.getFileName().toString();
+            String cellType = fileName.substring(0, fileName.lastIndexOf('.'));
+            EDIFCell cell = n.getCell(cellType);
+            cell.makePrimitive();
+        }
+        n.removeUnusedCellsFromAllWorkLibraries();
+        n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
     }
 }

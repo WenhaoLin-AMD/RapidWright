@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -157,10 +157,11 @@ public class DeviceResourcesVerifier {
         }
 
         // Create a lookup map for tile types
-        Map<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        Map<String, TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        int tileTypeCount = dReader.getTileTypeList().size();
         Map<TileTypeEnum, TileType.Reader> tileTypeEnumMap = new HashMap<TileTypeEnum, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
-        for (int i=0; i < dReader.getTileTypeList().size(); i++) {
+        for (int i=0; i < tileTypeCount; i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
             String name = allStrings.get(ttReader.getName());
             tileTypeMap.put(name, ttReader);
@@ -338,6 +339,8 @@ public class DeviceResourcesVerifier {
             expect(tile.getTileTypeEnum().name(), tileTypeName);
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
+            // Note: Tile.getUniqueAddress() is equivalent to the INDEX property on a Vivado Tile object
+            expect(tile.getUniqueAddress(), i);
 
             // Verify Tile Types
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
@@ -504,7 +507,7 @@ public class DeviceResourcesVerifier {
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
-                                                    Design.getMacroPrimitives(series);
+                                                    new EDIFLibrary(Design.getMacroPrimitives(series));
 
             if (!lib.isHDIPrimitivesLibrary()) {
                 // Remove unused macros from reference
@@ -742,7 +745,7 @@ public class DeviceResourcesVerifier {
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
-        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements(design.getDevice());
         Set<SiteTypeEnum> siteTypes = new HashSet<SiteTypeEnum>();
         siteTypes.addAll(sites.keySet());
         siteTypes.retainAll(siteMap.keySet());

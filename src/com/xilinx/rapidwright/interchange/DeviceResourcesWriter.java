@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -37,6 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.capnproto.MessageBuilder;
@@ -303,10 +303,10 @@ public class DeviceResourcesWriter {
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
-        EDIFLibrary macros = Design.getMacroPrimitives(series);
+        // Copy the macros library so we can modify it
+        EDIFLibrary macros = new EDIFLibrary(Design.getMacroPrimitives(series));
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
-        netlist.addLibrary(macros);
         List<EDIFCell> dupsToRemove = new ArrayList<EDIFCell>();
         for (EDIFCell hdiCell : prims.getCells()) {
             EDIFCell cell = macros.getCell(hdiCell.getName());
@@ -320,6 +320,10 @@ public class DeviceResourcesWriter {
         }
 
         removeUnusedMacros(macros, prims);
+
+        // Perform a deep copy because macro cells (which were shallow copied before)
+        // must now instantiate primitives from our primitives library
+        macros = netlist.copyLibraryAndSubCells(macros);
 
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
@@ -694,13 +698,20 @@ public class DeviceResourcesWriter {
 
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
 
-        int i=0;
+        // Order tile types by their TILE_TYPE_IDX (may not be contiguous)
+        Map<Integer, TileTypeEnum> tileTypeIndexMap = new TreeMap<>();
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
-            Tile tile = e.getValue();
+            tileTypeIndexMap.put(e.getValue().getTileTypeIndex(), e.getKey());
+        }
+
+        int i = 0;
+        for (Entry<Integer, TileTypeEnum> e : tileTypeIndexMap.entrySet()) {
+            TileTypeEnum type = e.getValue();
+            Tile tile = tileTypes.get(type);
             TileType.Builder tileType = tileTypesList.get(i);
-            tileTypeIndicies.put(e.getKey(), i);
+            tileTypeIndicies.put(type, i);
             // name
-            tileType.setName(allStrings.getIndex(e.getKey().name()));
+            tileType.setName(allStrings.getIndex(type.name()));
 
             // siteTypes
             Site[] sites = tile.getSites();
@@ -785,26 +796,27 @@ public class DeviceResourcesWriter {
     }
 
     public static void writeAllTilesToBuilder(Device device, DeviceResources.Device.Builder devBuilder, Map<TileTypeEnum, Integer> tileTypeIndicies) {
-        Collection<Tile> tiles = device.getAllTiles();
         StructList.Builder<DeviceResources.Device.Tile.Builder> tileBuilders =
-                devBuilder.initTileList(tiles.size());
+                devBuilder.initTileList(device.getColumns() * device.getRows());
 
         int i=0;
-        for (Tile tile : tiles) {
-            DeviceResources.Device.Tile.Builder tileBuilder = tileBuilders.get(i);
-            tileBuilder.setName(allStrings.getIndex(tile.getName()));
-            tileBuilder.setType(tileTypeIndicies.get(tile.getTileTypeEnum()));
-            Site[] sites = tile.getSites();
-            StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders =
-                    tileBuilder.initSites(sites.length);
-            for (int j=0; j < sites.length; j++) {
-                DeviceResources.Device.Site.Builder siteBuilder = siteBuilders.get(j);
-                siteBuilder.setName(allStrings.getIndex(sites[j].getName()));
-                siteBuilder.setType(j);
+        for (Tile[] tiles : device.getTiles()) {
+            for (Tile tile : tiles) {
+                DeviceResources.Device.Tile.Builder tileBuilder = tileBuilders.get(i);
+                tileBuilder.setName(allStrings.getIndex(tile.getName()));
+                tileBuilder.setType(tileTypeIndicies.get(tile.getTileTypeEnum()));
+                Site[] sites = tile.getSites();
+                StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders = tileBuilder
+                        .initSites(sites.length);
+                for (int j = 0; j < sites.length; j++) {
+                    DeviceResources.Device.Site.Builder siteBuilder = siteBuilders.get(j);
+                    siteBuilder.setName(allStrings.getIndex(sites[j].getName()));
+                    siteBuilder.setType(j);
+                }
+                tileBuilder.setRow((short) tile.getRow());
+                tileBuilder.setCol((short) tile.getColumn());
+                i++;
             }
-            tileBuilder.setRow((short)tile.getRow());
-            tileBuilder.setCol((short)tile.getColumn());
-            i++;
         }
 
     }
