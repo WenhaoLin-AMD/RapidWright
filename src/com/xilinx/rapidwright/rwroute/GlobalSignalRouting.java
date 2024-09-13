@@ -425,7 +425,6 @@ public class GlobalSignalRouting {
                     }
                 }
 
-                visitedRoutingNodes.add(routingNode);
                 if (debug) System.out.println("DEQUEUE:" + routingNode);
                 if (debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());
                 if (success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {
@@ -485,6 +484,7 @@ public class GlobalSignalRouting {
                     if (!pruneNode(nParent, getNodeState, visitedRoutingNodes, usedRoutingNodes)) {
                         nParent.setPrev(routingNode);
                         q.add(nParent);
+                        visitedRoutingNodes.add(nParent);
                     }
                 }
                 watchdog--;
