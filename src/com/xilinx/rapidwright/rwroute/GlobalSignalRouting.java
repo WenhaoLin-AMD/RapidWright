@@ -365,7 +365,6 @@ public class GlobalSignalRouting {
             boolean success = false;
             while (!q.isEmpty()) {
                 LightweightRouteNode routingNode = q.poll();
-                visitedRoutingNodes.add(routingNode);
                 if (debug) System.out.println("DEQUEUE:" + routingNode);
                 if (debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());
                 if (success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {
@@ -402,21 +401,33 @@ public class GlobalSignalRouting {
                             System.out.println(pathNode.toString());
                         }
                     }
+
                     break;
                 }
                 if (debug) {
                     System.out.println("KEEP LOOKING FOR A SOURCE...");
                 }
-                for (Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
-                    boolean shouldSkipThisRouteThru = routeThruHelper.isRouteThru(uphillNode, routingNode.getNode()) && 
-                                                      routingNode.getNode().getIntentCode() != IntentCode.NODE_IRI &&
-                                                      routingNode.getNode().getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE &&
-                                                      routingNode.getNode().getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE_MY;
+                node = routingNode.getNode();
+                for (Node uphillNode : node.getAllUphillNodes()) {
+                    boolean shouldSkipThisRouteThru = routeThruHelper.isRouteThru(uphillNode, node) &&
+                                                      node.getIntentCode() != IntentCode.NODE_IRI &&
+                                                      node.getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE &&
+                                                      node.getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE_MY;
                     if (shouldSkipThisRouteThru) continue;
+                    if (uphillNode.getIntentCode() == IntentCode.NODE_CLE_CNODE &&
+                        node.getIntentCode() != IntentCode.NODE_CLE_CTRL) {
+                        // Only allow PIPs with NODE_CLE_CNODE -> NODE_CLE_CTRL intent codes
+                        // because NODE_CLE_CNODE are a critical resource for reaching for
+                        // NODE_CLE_CTRL site pins, yet they can be used to reach back into
+                        // the INT tile -- prevent this from happening here in order to avoid
+                        // unroutable situations when a NODE_CLE_CTRL is a signal net sink
+                        continue;
+                    }
                     LightweightRouteNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
                     if (!pruneNode(nParent, getNodeState, visitedRoutingNodes, usedRoutingNodes)) {
                         nParent.setPrev(routingNode);
                         q.add(nParent);
+                        visitedRoutingNodes.add(nParent);
                     }
                 }
                 watchdog--;
