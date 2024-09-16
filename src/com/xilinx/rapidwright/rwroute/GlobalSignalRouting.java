@@ -341,48 +341,6 @@ public class GlobalSignalRouting {
         Set<LightweightRouteNode> usedRoutingNodes = new HashSet<>();
         Map<Node, LightweightRouteNode> createdRoutingNodes = new HashMap<>();
 
-        String debugPinName = "IN DSP_X4Y143.CEALUMODE";
-        List<String> vivadoPath = new ArrayList<>(List.of(
-            "DSP_ROCF_B_TILE_X36Y290/DSP_DSP58_3_CEALUMODE_PIN",
-            "INTF_ROCF_BR_TILE_X36Y291/INTF_IRI_QUADRANT_GREEN_3_CE3_O",
-            "INTF_ROCF_BR_TILE_X36Y291/INTF_IRI_QUADRANT_GREEN_3_CE3_O_PIN",
-            "INTF_ROCF_BR_TILE_X36Y291/INTF_IRI_QUADRANT_GREEN_3_CE3_PIN",
-            "INTF_ROCF_BR_TILE_X36Y291/INTF_IRI_QUADRANT_GREEN_3_CE3",
-            "INTF_ROCF_BR_TILE_X36Y291/INTF_CNODE_ATOM_9_INT_OUT1",
-            "INT_X36Y291/OUT_EE2_W_BEG1",
-            "INT_X36Y291/INT_NODE_SDQ_ATOM_93_INT_OUT0",
-            "INT_X36Y295/OUT_SS4_W_BEG1",
-            "INT_X36Y295/INT_NODE_SDQ_ATOM_91_INT_OUT1",
-            "CLE_E_CORE_X36Y295/CLE_SLICEL_TOP_0_B_O",
-            "CLE_E_CORE_X36Y295/CLE_SLICEL_TOP_0_B_O_PIN"
-        ));
-
-        // String debugPinName = "IN RAMB36_X3Y54.WEBWEU_2_";
-        // List<String> vivadoPath = new ArrayList<>(List.of(
-        //     "BRAM_ROCF_BR_TILE_X33Y220/BRAM_CORE_3_WEBWEU_2__PIN",
-        //     "INTF_ROCF_BR_TILE_X33Y222/INTF_IRI_QUADRANT_GREEN_1_IMUX_O11",
-        //     "INTF_ROCF_BR_TILE_X33Y222/INTF_IRI_QUADRANT_GREEN_1_IMUX_O11_PIN",
-        //     "INTF_ROCF_BR_TILE_X33Y222/INTF_IRI_QUADRANT_GREEN_1_IMUX_IN11_PIN",
-        //     "INT_X33Y222/IMUX_B_E23",
-        //     "INT_X33Y222/INT_NODE_IMUX_ATOM_74_INT_OUT1",
-        //     "INTF_ROCF_BR_TILE_X33Y222/IF_INT_BNODE_OUTS53",
-        //     "INT_X33Y222/BOUNCE_E28",
-        //     "INT_X33Y222/INT_NODE_IMUX_ATOM_27_INT_OUT0",
-        //     "INT_X33Y226/OUT_SS4_E_BEG7",
-        //     "INT_X33Y226/INT_NODE_SDQ_ATOM_74_INT_OUT0",
-        //     "INT_X33Y227/OUT_SS1_E_BEG15",
-        //     "INT_X33Y228/OUT_ENODE_E_0",
-        //     "INT_X33Y228/INT_SDQ_RED_ATOM_16_INT_OUT0",
-        //     "INT_X33Y228/INT_NODE_SDQ_ATOM_29_INT_OUT0",
-        //     "CLE_E_CORE_X33Y228/CLE_SLICEL_TOP_0_C_O",
-        //     "CLE_E_CORE_X33Y228/CLE_SLICEL_TOP_0_C_O_PIN"
-        // ));
-
-        HashMap<Node, Integer> node2FirstPopWatchDog = new HashMap<>();
-        HashMap<Node, Integer> node2LastPopWatchDog = new HashMap<>();
-
-        boolean findDebugPin = false;
-
         boolean debug = false;
         if (debug) {
             System.out.println("Net: " + currNet.getName());
@@ -390,12 +348,6 @@ public class GlobalSignalRouting {
 
         Set<SitePin> sitePinsToCreate = new HashSet<>();
         for (SitePinInst sink : currNet.getPins()) {
-            findDebugPin = false;
-            if (sink.toString().equals(debugPinName)) {
-                findDebugPin = true;
-                System.out.println("Found " + debugPinName);
-            }
-
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
             int watchdog = 50000;
@@ -413,18 +365,6 @@ public class GlobalSignalRouting {
             boolean success = false;
             while (!q.isEmpty()) {
                 LightweightRouteNode routingNode = q.poll();
-
-                if (findDebugPin) {
-                    if (vivadoPath.contains(routingNode.getNode().toString())) {
-                        System.out.println(String.format("%-70s", routingNode.getNode().toString()) + " pop with watchdog: " + watchdog);
-                    }
-                    
-                    node2LastPopWatchDog.put(routingNode.getNode(), watchdog);
-                    if (!node2FirstPopWatchDog.containsKey(routingNode.getNode())) {
-                        node2FirstPopWatchDog.put(routingNode.getNode(), watchdog);
-                    }
-                }
-
                 if (debug) System.out.println("DEQUEUE:" + routingNode);
                 if (debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());
                 if (success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {
@@ -459,13 +399,6 @@ public class GlobalSignalRouting {
                     if (debug) {
                         for (Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
-                        }
-                    }
-
-                    if (findDebugPin) {
-                        System.out.println("\n---------------------------Our Path--------------------------------\n");
-                        for (Node pathNode: pathNodes) {
-                            System.out.println(String.format("%-70s", pathNode.toString()) + " first pop: " + node2FirstPopWatchDog.get(pathNode) + " last pop: " + node2LastPopWatchDog.get(pathNode));
                         }
                     }
 
