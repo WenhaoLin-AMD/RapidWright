@@ -2309,9 +2309,9 @@ public class DesignTools {
                         queue.add(sitePIP.getOutputPin());
                     } else if (sink.getBEL().isFF()) {
                         // FF pass thru option (not a site PIP)
-                        if (sink.getBEL().getPin("Q") == null) {
-                            continue;
-                        }
+                        // if (sink.getBEL().getPin("Q") == null) {
+                        //     continue;
+                        // }
                         siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
                         if (siteWires.contains(siteWireName)) {
                             sitePins.add(siteWireName);
