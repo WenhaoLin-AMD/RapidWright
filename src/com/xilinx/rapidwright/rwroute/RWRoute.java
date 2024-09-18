@@ -217,12 +217,12 @@ public class RWRoute {
         DesignTools.createMissingSitePinInsts(design);
 
         // Temporarily fix -> 
-        // for (Net net: design.getNets()) {
-        //     // if (!NetTools.isClockNet(net) && !net.isStaticNet()) {
-        //     if (!NetTools.isClockNet(net)) {
-        //         net.unroute();
-        //     }
-        // }
+        for (Net net: design.getNets()) {
+            // if (!NetTools.isClockNet(net) && !net.isStaticNet()) {
+            if (!NetTools.isClockNet(net)) {
+                net.unroute();
+            }
+        }
         // Temporarily fix <-
     }
 
