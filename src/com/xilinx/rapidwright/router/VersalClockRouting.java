@@ -94,16 +94,16 @@ public class VersalClockRouting {
                 RouteNode parent = curr.getParent();
                 if (parent != null) {
                     if (parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
-                            w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
+                            w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                         // Disallow ability to go from VROUTE back to HROUTE
                         continue;
                     }
-                    if (w.getIntentCode()     == IntentCode.NODE_GLOBAL_VDISTR &&
-                       curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE &&
+                    if (w.getIntentCode()     == IntentCode.NODE_GLOBAL_VDISTR_LVL2 &&
+                       curr.getIntentCode()   == IntentCode.NODE_GLOBAL_GCLK &&
                        parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
-                       clockRegion.equals(w.getTile().getClockRegion()) &&
-                       clockRegion.equals(curr.getTile().getClockRegion()) &&
-                       clockRegion.equals(parent.getTile().getClockRegion()) &&
+                    //    clockRegion.equals(w.getTile().getClockRegion()) &&
+                    //    clockRegion.equals(curr.getTile().getClockRegion()) &&
+                    //    clockRegion.equals(parent.getTile().getClockRegion()) &&
                        parent.getWireName().contains("BOT")) {
                         if (adjusted) {
                             if (findCentroidHroute) {
@@ -125,8 +125,8 @@ public class VersalClockRouting {
                 }
 
                 // Only using routing lines to get to centroid
-                if (!w.getIntentCode().isUltraScaleClockRouting()) continue;
-                if (adjusted && !findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
+                // if (!w.getIntentCode().isVersalClockRouting()) continue;
+                if (adjusted && !findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                     continue;
                 }
                 RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
