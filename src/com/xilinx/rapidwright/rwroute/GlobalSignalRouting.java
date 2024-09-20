@@ -56,6 +56,7 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
+import com.xilinx.rapidwright.router.VersalClockRouting;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
@@ -183,42 +184,116 @@ public class GlobalSignalRouting {
      *                      for same net as we're routing), or unavailable (preserved for other net).
      */
     public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
-        List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-        ClockRegion centroid = findCentroid(clk, device);
+        if (device.getSeries() != Series.Versal) {
+            boolean debug = true;
+            List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+            ClockRegion centroid = findCentroid(clk, device);
 
-        List<ClockRegion> upClockRegions = new ArrayList<>();
-        List<ClockRegion> downClockRegions = new ArrayList<>();
-        // divides clock regions into two groups
-        divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+            List<ClockRegion> upClockRegions = new ArrayList<>();
+            List<ClockRegion> downClockRegions = new ArrayList<>();
+            // divides clock regions into two groups
+            divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 
-        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+            RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
 
-        RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
-        // Two VROUTEs going up and down
-        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-        if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+            if (debug) {
+                System.out.println("clkRoutingLine: " + clkRoutingLine);
+            }
+
+            RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+
+            if (debug) {
+                System.out.println("centroidHRouteNode: " + centroidHRouteNode);
+            }
+            
+            RouteNode vrouteUp = null;
+            RouteNode vrouteDown;
+            // Two VROUTEs going up and down
+            ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+            if (aboveCentroid != null) {
+                vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+                if (debug) {
+                    System.out.println("vrouteUp: " + vrouteUp);
+                }
+            }
+            vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+
+            if (debug) {
+                System.out.println("vrouteDown: " + vrouteDown);
+            }
+
+            List<RouteNode> upDownDistLines = new ArrayList<>();
+            if (aboveCentroid != null) {
+                List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+                if (upLines != null) upDownDistLines.addAll(upLines);
+            }
+
+            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            if (downLines != null) upDownDistLines.addAll(downLines);
+
+            Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+            UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+
+            UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+
+            Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
+            clk.setPIPs(clkPIPsWithoutDuplication);
         }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        else {
+            boolean debug = true;
+            List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+            ClockRegion centroid = findCentroid(clk, device);
 
-        List<RouteNode> upDownDistLines = new ArrayList<>();
-        if (aboveCentroid != null) {
-            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
-            if (upLines != null) upDownDistLines.addAll(upLines);
+            List<ClockRegion> upClockRegions = new ArrayList<>();
+            List<ClockRegion> downClockRegions = new ArrayList<>();
+            // divides clock regions into two groups
+            divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+
+            RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+
+            if (debug) {
+                System.out.println("clkRoutingLine: " + clkRoutingLine);
+            }
+
+            RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+
+            if (debug) {
+                System.out.println("centroidHRouteNode: " + centroidHRouteNode);
+            }
+            
+            RouteNode vrouteUp = null;
+            RouteNode vrouteDown;
+            // Two VROUTEs going up and down
+            ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+            if (aboveCentroid != null) {
+                vrouteUp = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+                if (debug) {
+                    System.out.println("vrouteUp: " + vrouteUp);
+                }
+            }
+            vrouteDown = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+
+            if (debug) {
+                System.out.println("vrouteDown: " + vrouteDown);
+            }
+
+            List<RouteNode> upDownDistLines = new ArrayList<>();
+            if (aboveCentroid != null) {
+                List<RouteNode> upLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+                if (upLines != null) upDownDistLines.addAll(upLines);
+            }
+
+            List<RouteNode> downLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            if (downLines != null) upDownDistLines.addAll(downLines);
+
+            Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+            VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+
+            VersalClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+
+            Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
+            clk.setPIPs(clkPIPsWithoutDuplication);
         }
-
-        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-        if (downLines != null) upDownDistLines.addAll(downLines);
-
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
-        UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
-
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
-
-        Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
-        clk.setPIPs(clkPIPsWithoutDuplication);
     }
 
     /**

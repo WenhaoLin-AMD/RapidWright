@@ -44,7 +44,7 @@ public class VersalClockRouting {
         while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode();
-            if (c == IntentCode.NODE_GLOBAL_HROUTE) {
+            if (c == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
@@ -108,7 +108,7 @@ public class VersalClockRouting {
                         if (adjusted) {
                             if (findCentroidHroute) {
                                 centroidHRouteNode = curr.getParent();
-                                while (centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE) {
+                                while (centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                                     centroidHRouteNode = centroidHRouteNode.getParent();
                                 }
                                 clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSource());
