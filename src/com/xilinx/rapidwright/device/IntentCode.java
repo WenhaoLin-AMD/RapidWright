@@ -158,6 +158,18 @@ public enum IntentCode {
         return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this;
     }
 
+    public boolean isVersalClocking() {
+        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_HROUTE == this || NODE_GLOBAL_HROUTE_HSR == this || NODE_GLOBAL_LEAF == this || NODE_GLOBAL_VROUTE == this;
+    }
+
+    public boolean isVersalClockRouting() {
+        return NODE_GLOBAL_HDISTR_HSR == this || NODE_GLOBAL_VROUTE == this;
+    }
+
+    public boolean isVersalClockDistribution() {
+        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this;
+    }
+
     private static final int SERIES7_START_IDX = 23;
     private static final int SERIES7_END_IDX = SERIES7_START_IDX + 33 - 1;
 

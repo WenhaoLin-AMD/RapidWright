@@ -82,7 +82,7 @@ public class VersalClockRouting {
         startingRouteNode.setParent(null);
         q.add(startingRouteNode);
         Tile approxTarget = clockRegion.getApproximateCenter();
-        int watchDog = 10000;
+        int watchDog = 1000000;
 
         RouteNode centroidHRouteNode;
 
@@ -220,7 +220,7 @@ public class VersalClockRouting {
     public static RouteNode transitionCentroidToDistributionLine(Net clk, RouteNode centroidRouteLine, ClockRegion cr) {
         Queue<RouteNode> q = new LinkedList<>();
         q.add(centroidRouteLine);
-        int watchDog = 1000;
+        int watchDog = 100000;
         while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode();
@@ -230,8 +230,11 @@ public class VersalClockRouting {
             }
             for (Wire w : curr.getWireConnections()) {
                 // Stay in this clock region to transition from
-                if (!cr.equals(w.getTile().getClockRegion())) continue;
-                if (!w.getIntentCode().isUltraScaleClocking()) continue;
+                // if (!cr.equals(w.getTile().getClockRegion())) continue;
+                // if (w.getWireIndex() == 281) {
+                //     System.out.println(w.toString());
+                // }
+                // if (!w.getIntentCode().isVersalClocking()) continue;
                 q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
             }
             if (watchDog-- == 0) break;
@@ -400,11 +403,11 @@ public class VersalClockRouting {
                 for (Wire w : curr.getWireConnections()) {
                     // Stay in this clock region
                     if (!currCR.equals(w.getTile().getClockRegion())) continue;
-                    if (!w.getIntentCode().isUltraScaleClocking()) {
+                    if (!w.getIntentCode().isVersalClocking()) {
                         // Final node will not be clocking intent code
                         SitePin p = w.getSitePin();
                         if (p == null) continue;
-                        if (p.getSite().getSiteTypeEnum() != SiteTypeEnum.BUFCE_LEAF) continue;
+                        if (p.getSite().getSiteTypeEnum() != SiteTypeEnum.BUFDIV_LEAF) continue;
                     }
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
                     if (visited.contains(rn)) continue;
@@ -497,7 +500,7 @@ public class VersalClockRouting {
                                                                      Collection<ClockRegion> clockRegions,
                                                                      boolean down,
                                                                      Function<Node, NodeStatus> getNodeStatus) {
-        RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
+        RouteNode centroidDistNode = VersalClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
         if (centroidDistNode == null) return null;
 
         Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions, getNodeStatus);

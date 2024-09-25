@@ -187,7 +187,11 @@ public class GlobalSignalRouting {
         if (device.getSeries() != Series.Versal) {
             boolean debug = true;
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+
             ClockRegion centroid = findCentroid(clk, device);
+            if (debug) {
+                System.out.println("centroid CR: " + centroid);
+            }
 
             List<ClockRegion> upClockRegions = new ArrayList<>();
             List<ClockRegion> downClockRegions = new ArrayList<>();
@@ -243,6 +247,15 @@ public class GlobalSignalRouting {
             boolean debug = true;
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             ClockRegion centroid = findCentroid(clk, device);
+
+            if (debug) {
+                System.out.println("centroid: " + centroid);
+            }
+
+            // if (debug) {
+            //     centroid = device.getClockRegion(1, 3);
+            //     System.out.println("centroid: " + centroid);
+            // }
 
             List<ClockRegion> upClockRegions = new ArrayList<>();
             List<ClockRegion> downClockRegions = new ArrayList<>();
