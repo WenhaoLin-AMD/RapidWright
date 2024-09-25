@@ -252,10 +252,10 @@ public class GlobalSignalRouting {
                 System.out.println("centroid: " + centroid);
             }
 
-            // if (debug) {
-            //     centroid = device.getClockRegion(1, 3);
-            //     System.out.println("centroid: " + centroid);
-            // }
+            if (debug) {
+                centroid = device.getClockRegion(1, 3);
+                System.out.println("centroid: " + centroid);
+            }
 
             List<ClockRegion> upClockRegions = new ArrayList<>();
             List<ClockRegion> downClockRegions = new ArrayList<>();
