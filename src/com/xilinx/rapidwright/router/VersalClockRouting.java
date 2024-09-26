@@ -372,8 +372,7 @@ public class VersalClockRouting {
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
-                    if (!w.getIntentCode().isVersalClocking()) continue;
-                    // if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
+                    if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
                     if (visited.contains(rn)) continue;
                     rn.setCost(w.getTile().getManhattanDistance(crTarget));
