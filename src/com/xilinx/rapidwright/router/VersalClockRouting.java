@@ -11,6 +11,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.rwroute.GlobalSignalRouting;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
@@ -81,8 +82,8 @@ public class VersalClockRouting {
         HashSet<RouteNode> visited = new HashSet<>();
         startingRouteNode.setParent(null);
         q.add(startingRouteNode);
-        Tile approxTarget = clockRegion.getApproximateCenter();
-        int watchDog = 1000000;
+        // Tile approxTarget = clockRegion.getApproximateCenter();
+        int watchDog = 10000000;
 
         RouteNode centroidHRouteNode;
 
@@ -102,8 +103,8 @@ public class VersalClockRouting {
                        curr.getIntentCode()   == IntentCode.NODE_GLOBAL_GCLK &&
                        parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
                     //    clockRegion.equals(w.getTile().getClockRegion()) &&
-                    //    clockRegion.equals(curr.getTile().getClockRegion()) &&
-                    //    clockRegion.equals(parent.getTile().getClockRegion()) &&
+                       clockRegion.equals(curr.getTile().getClockRegion()) &&
+                       clockRegion.equals(parent.getTile().getClockRegion()) &&
                        parent.getWireName().contains("BOT")) {
                         if (adjusted) {
                             if (findCentroidHroute) {
@@ -125,13 +126,15 @@ public class VersalClockRouting {
                 }
 
                 // Only using routing lines to get to centroid
-                // if (!w.getIntentCode().isVersalClockRouting()) continue;
+                if (!w.getIntentCode().isVersalClockRouting()) continue;
                 if (adjusted && !findCentroidHroute && w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                     continue;
                 }
                 RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
                 if (visited.contains(rn)) continue;
-                rn.setCost(rn.getTile().getManhattanDistance(approxTarget));
+                ClockRegion rnClockRegion = rn.getTile().getClockRegion();
+                int cost = Math.abs(rnClockRegion.getColumn() - clockRegion.getColumn()) + Math.abs(rnClockRegion.getRow() - clockRegion.getRow());
+                rn.setCost(cost);
                 q.add(rn);
             }
             if (watchDog-- == 0) {
@@ -220,21 +223,99 @@ public class VersalClockRouting {
     public static RouteNode transitionCentroidToDistributionLine(Net clk, RouteNode centroidRouteLine, ClockRegion cr) {
         Queue<RouteNode> q = new LinkedList<>();
         q.add(centroidRouteLine);
+        // int watchDog = 100000;
+        // while (!q.isEmpty()) {
+        //     RouteNode curr = q.poll();
+        //     IntentCode c = curr.getIntentCode();
+        //     // if (curr.getTile().getClockRegion().equals(cr) && c == IntentCode.NODE_GLOBAL_VDISTR) {
+        //     //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
+        //     //     return curr;
+        //     // }
+        //     if (c == IntentCode.NODE_GLOBAL_VDISTR) {
+        //         clk.getPIPs().addAll(curr.getPIPsBackToSource());
+        //         return curr;
+        //     }
+        //     for (Wire w : curr.getWireConnections()) {
+        //         // Stay in this clock region to transition from
+        //         // if (!cr.equals(w.getTile().getClockRegion())) continue;
+        //         if (!w.getIntentCode().isVersalClocking()) continue;
+        //         q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
+        //     }
+        //     if (watchDog-- == 0) break;
+        // }
+        // return null;
+        int watchDogLvl2 = 100000;
+        RouteNode nodeVDistrLvl2 = null;
+        while (!q.isEmpty()) {
+            RouteNode curr = q.poll();
+            IntentCode c = curr.getIntentCode();
+            // if (curr.getTile().getClockRegion().equals(cr) && c == IntentCode.NODE_GLOBAL_VDISTR) {
+            //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
+            //     return curr;
+            // }
+            if (c == IntentCode.NODE_GLOBAL_VDISTR_LVL2) {
+                clk.getPIPs().addAll(curr.getPIPsBackToSource());
+                // return curr;
+                nodeVDistrLvl2 = curr;
+                break;
+            }
+            for (Wire w : curr.getWireConnections()) {
+                // Stay in this clock region to transition from
+                // if (!cr.equals(w.getTile().getClockRegion())) continue;
+                if (!w.getIntentCode().isVersalClocking()) continue;
+                q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
+            }
+            if (watchDogLvl2-- == 0) break;
+        }
+        if (nodeVDistrLvl2 == null)
+            return null;
+
+        System.out.println("nodeVDistrLvl2: " + nodeVDistrLvl2);
+        
+        int watchDogLvl1 = 100000;
+        RouteNode nodeVDistrLvl1 = null;
+        while (!q.isEmpty()) {
+            RouteNode curr = q.poll();
+            IntentCode c = curr.getIntentCode();
+            // if (curr.getTile().getClockRegion().equals(cr) && c == IntentCode.NODE_GLOBAL_VDISTR) {
+            //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
+            //     return curr;
+            // }
+            if (c == IntentCode.NODE_GLOBAL_VDISTR_LVL1) {
+                clk.getPIPs().addAll(curr.getPIPsBackToSource());
+                // return curr;
+                nodeVDistrLvl1 = curr;
+                break;
+            }
+            for (Wire w : curr.getWireConnections()) {
+                // Stay in this clock region to transition from
+                // if (!cr.equals(w.getTile().getClockRegion())) continue;
+                if (!w.getIntentCode().isVersalClocking()) continue;
+                q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
+            }
+            if (watchDogLvl1-- == 0) break;
+        }
+        if (nodeVDistrLvl1 == null)
+            return null;
+
+        System.out.println("nodeVDistrLvl1: " + nodeVDistrLvl1);
+
         int watchDog = 100000;
         while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             IntentCode c = curr.getIntentCode();
-            if (curr.getTile().getClockRegion().equals(cr) && c == IntentCode.NODE_GLOBAL_VDISTR) {
+            // if (curr.getTile().getClockRegion().equals(cr) && c == IntentCode.NODE_GLOBAL_VDISTR) {
+            //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
+            //     return curr;
+            // }
+            if (c == IntentCode.NODE_GLOBAL_VDISTR) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
             for (Wire w : curr.getWireConnections()) {
                 // Stay in this clock region to transition from
                 // if (!cr.equals(w.getTile().getClockRegion())) continue;
-                // if (w.getWireIndex() == 281) {
-                //     System.out.println(w.toString());
-                // }
-                // if (!w.getIntentCode().isVersalClocking()) continue;
+                if (!w.getIntentCode().isVersalClocking()) continue;
                 q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
             }
             if (watchDog-- == 0) break;
@@ -291,7 +372,8 @@ public class VersalClockRouting {
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
-                    if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
+                    if (!w.getIntentCode().isVersalClocking()) continue;
+                    // if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
                     if (visited.contains(rn)) continue;
                     rn.setCost(w.getTile().getManhattanDistance(crTarget));
@@ -501,6 +583,7 @@ public class VersalClockRouting {
                                                                      boolean down,
                                                                      Function<Node, NodeStatus> getNodeStatus) {
         RouteNode centroidDistNode = VersalClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
+        System.out.println("centroidDistNode: " + centroidDistNode);
         if (centroidDistNode == null) return null;
 
         Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions, getNodeStatus);
