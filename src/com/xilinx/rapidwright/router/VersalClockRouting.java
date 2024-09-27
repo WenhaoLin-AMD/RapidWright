@@ -253,7 +253,7 @@ public class VersalClockRouting {
             //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
             //     return curr;
             // }
-            if (c == IntentCode.NODE_GLOBAL_VDISTR_LVL2) {
+            if (curr.getTile().getClockRegion().getColumn() == cr.getColumn() && curr.getName().contains("BOT") && c == IntentCode.NODE_GLOBAL_VDISTR_LVL2) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 // return curr;
                 nodeVDistrLvl2 = curr;
@@ -281,7 +281,7 @@ public class VersalClockRouting {
             //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
             //     return curr;
             // }
-            if (c == IntentCode.NODE_GLOBAL_VDISTR_LVL1) {
+            if (curr.getTile().getClockRegion().getColumn() == cr.getColumn() && curr.getName().contains("BOT") && c == IntentCode.NODE_GLOBAL_VDISTR_LVL1) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 // return curr;
                 nodeVDistrLvl1 = curr;
@@ -308,7 +308,7 @@ public class VersalClockRouting {
             //     clk.getPIPs().addAll(curr.getPIPsBackToSource());
             //     return curr;
             // }
-            if (c == IntentCode.NODE_GLOBAL_VDISTR) {
+            if (curr.getTile().getClockRegion().getColumn() == cr.getColumn() && curr.getName().contains("BOT") && c == IntentCode.NODE_GLOBAL_VDISTR) {
                 clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 return curr;
             }
@@ -423,7 +423,7 @@ public class VersalClockRouting {
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
-                    if (!w.getIntentCode().isUltraScaleClocking()) continue;
+                    if (!w.getIntentCode().isVersalClocking()) continue;
                     q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                 }
             }
@@ -585,7 +585,14 @@ public class VersalClockRouting {
         System.out.println("centroidDistNode: " + centroidDistNode);
         if (centroidDistNode == null) return null;
 
-        Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions, getNodeStatus);
+        Collection<ClockRegion> clockRegionsInSameColumnOfCentroidDist = new ArrayList<>();
+        for (ClockRegion cr: clockRegions) {
+            if (cr.getColumn() == centroidDistNode.getTile().getClockRegion().getColumn()) {
+                clockRegionsInSameColumnOfCentroidDist.add(cr);
+            }
+        }
+
+        Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegionsInSameColumnOfCentroidDist, getNodeStatus);
 
         return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, getNodeStatus);
     }
