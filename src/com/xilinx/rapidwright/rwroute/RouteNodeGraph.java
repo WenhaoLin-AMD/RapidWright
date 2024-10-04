@@ -326,7 +326,9 @@ public class RouteNodeGraph {
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
                 String otherPinName;
-                if (pinName.endsWith("MUX")) {
+                if (design.getSeries() == Series.Versal) {
+                    continue;
+                } else if (pinName.endsWith("MUX")) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
                     otherPinName = lutLetter + "MUX";

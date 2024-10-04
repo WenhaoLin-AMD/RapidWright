@@ -218,6 +218,7 @@ public class RWRoute {
 
         // Temporarily fix -> 
         for (Net net: design.getNets()) {
+            if (NetTools.isGlobalClock(net)) continue;
             net.unroute();
         }
         // Temporarily fix <-
@@ -718,9 +719,9 @@ public class RWRoute {
         routerTimer.createRuntimeTracker("Routing", routerTimer.getRootRuntimeTracker()).start();
         MessageGenerator.printHeader("Route Design");
 
-        routerTimer.createRuntimeTracker("route clock", "Routing").start();
-        routeGlobalClkNets();
-        routerTimer.getRuntimeTracker("route clock").stop();
+        // routerTimer.createRuntimeTracker("route clock", "Routing").start();
+        // routeGlobalClkNets();
+        // routerTimer.getRuntimeTracker("route clock").stop();
 
         routerTimer.createRuntimeTracker("route static nets", "Routing").start();
         // Routes static nets (VCC and GND) before signals for now.
