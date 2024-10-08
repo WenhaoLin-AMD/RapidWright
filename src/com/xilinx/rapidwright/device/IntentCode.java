@@ -159,7 +159,7 @@ public enum IntentCode {
     }
 
     public boolean isVersalClocking() {
-        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_VDISTR_LVL1 == this || NODE_GLOBAL_VDISTR_LVL2 == this || NODE_GLOBAL_HROUTE_HSR == this || NODE_GLOBAL_GCLK == this || NODE_GLOBAL_VROUTE == this || NODE_GLOBAL_LEAF == this;
+        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_HDISTR_LOCAL == this || NODE_PINFEED == this || NODE_GLOBAL_HDISTR_HSR == this || NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_VDISTR_LVL1 == this || NODE_GLOBAL_VDISTR_LVL2 == this || NODE_GLOBAL_HROUTE_HSR == this || NODE_GLOBAL_GCLK == this || NODE_GLOBAL_VROUTE == this || NODE_GLOBAL_LEAF == this;
     }
 
     public boolean isVersalClockRouting() {

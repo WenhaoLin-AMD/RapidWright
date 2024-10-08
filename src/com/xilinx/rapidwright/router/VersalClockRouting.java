@@ -325,17 +325,20 @@ public class VersalClockRouting {
         List<RouteNode> distLines = new ArrayList<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
+        Set<Node> visited = new HashSet<>();
         // nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
         nextClockRegion: for (ClockRegion targetCR : clockRegions) {
             q.clear();
             RouteNode vertDistLine = vertDistLines.get(targetCR.getRow());
             // assert(vertDistLine.getParent() == null);
+            vertDistLine.setParent(null);
             q.add(vertDistLine);
+            
             // ClockRegion targetCR = e.getKey();
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
                 IntentCode c = curr.getIntentCode();
-                if (targetCR.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR) {
+                if (targetCR.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     for (PIP pip : pips) {
                         allPIPs.add(pip);
@@ -350,13 +353,22 @@ public class VersalClockRouting {
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
-                    // if (!w.getIntentCode().isVersalClocking()) continue;
-                    q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
+                    if (!w.getIntentCode().isVersalClocking()) continue;
+                    Node n = Node.getNode(w);
+                    q.add(new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1));
                 }
             }
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + targetCR);
         }
         clk.getPIPs().addAll(allPIPs);
+        Set<IntentCode> allICs = new HashSet<>();
+        for (PIP pip: allPIPs) {
+            allICs.add(pip.getStartNode().getIntentCode());
+            allICs.add(pip.getEndNode().getIntentCode());
+        }
+        for (IntentCode ic: allICs) {
+            System.out.println(ic);
+        }
         return distLines;
     }
 
