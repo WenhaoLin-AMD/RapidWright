@@ -582,6 +582,37 @@ public class RouteNodeGraph {
         return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
+    public boolean isAccessibleNodeInINTTile(RouteNode rnode, RouteNode childRnode, Connection connection) {
+        assert(rnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+        assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+
+        // Below situations should not be skipped
+        if (design.getSeries() != Series.Versal) {
+            return true;
+        }
+        if (rnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            return true;
+        }
+        Tile sinkTile = connection.getSinkRnode().getTile();
+        TileTypeEnum sinkTileType = sinkTile.getTileTypeEnum();
+        if (sinkTileType != TileTypeEnum.CLE_W_CORE && sinkTileType != TileTypeEnum.CLE_E_CORE) {
+            return true;
+        }
+        if (rnode.getTile().getTileXCoordinate() != sinkTile.getTileXCoordinate()) {
+            return true;
+        }
+        if (rnode.getTile().getTileYCoordinate() != sinkTile.getTileYCoordinate()) {
+            return true;
+        }
+
+        // If rnode is already in the INT tile, next step should be INODE/IMUX node
+        if (rnode.getIntentCode() != IntentCode.NODE_INODE && childRnode.getIntentCode() != IntentCode.NODE_INODE) {
+            return false;
+        }
+
+        return true;
+    }
+
     protected boolean allowRoutethru(Node head, Node tail) {
         if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
             return false;

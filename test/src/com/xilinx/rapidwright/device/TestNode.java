@@ -23,17 +23,24 @@
 package com.xilinx.rapidwright.device;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestNode {
     @ParameterizedTest
@@ -151,6 +158,126 @@ public class TestNode {
             }
         }
         System.out.println("visited.size() = " + visited.size());
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    public void testLUTNodeReachabilityVersal(String partName, String tileName, IntentCode ic) {
+        System.out.println("----------------------------------------" );
+        System.out.println("Testing: " + partName + " " + tileName + " " + ic);
+        Device device = Device.getDevice(partName);
+        Tile baseTile = device.getTile(tileName);
+        Queue<Node> queue = new ArrayDeque<>();
+        for (String wireName : baseTile.getWireNames()) {
+            Node node = Node.getNode(baseTile, wireName);
+            if (node.getIntentCode() != ic) {
+                continue;
+            }
+            queue.add(node);
+        }
+        System.out.println("Initial queue.size() = " + queue.size());
+        
+        // for (String wireName : baseTile.getWireNames()) {
+            // if (!wireName.matches("\\w*[01]_[A-H][1-5]_PIN")) {
+            //     continue;
+            // }
+        //     queue.add(Node.getNode(baseTile, wireName));
+        // }
+        // System.out.println("Initial queue.size() = " + queue.size());
+
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        System.out.println("2-step downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+    }
+
+    static List<Arguments> testLUTNodeReachabilityVersal() {
+        return List.of(
+            Arguments.of("xcvp1002", "CLE_E_CORE_X27Y145", IntentCode.NODE_PINFEED),
+            Arguments.of("xcvp1002", "CLE_W_CORE_X26Y145", IntentCode.NODE_PINFEED),
+            Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_BNODE),
+            Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_BNODE),
+            Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_CNODE),
+            Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_CNODE)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    public void testBCNodeInINTTileReachAllNeighborLUTInputPinsIn3Steps(String partName, int x, int y) {
+        System.out.println("----------------------------------------" );
+        System.out.println("Testing if B/CNODEs in INTX" + x + "Y" + y + " can reach all LUT input pins in neighbor tiles");
+        Device device = Device.getDevice(partName);
+        Tile intTile = device.getTile("INT", x, y);
+        Assertions.assertNotNull(intTile);
+        Tile wNeighborTile = device.getTile("CLE_W_CORE", x, y);
+        // Assertions.assertNotNull(wNeighborTile);
+        Tile eNeighborTile = device.getTile("CLE_E_CORE", x, y);
+        // Assertions.assertNotNull(eNeighborTile);
+        List<Node> allInputNodesOfLUTs = new ArrayList<>();
+        for (Tile neighborTile: Arrays.asList(wNeighborTile, eNeighborTile)) {
+            if (neighborTile == null) continue;
+            System.out.println("Find " + neighborTile.toString());
+            for (String wireName: neighborTile.getWireNames()) {
+                if (!wireName.matches("\\w*[01]_[A-H][1-5]_PIN")) {
+                    continue;
+                }
+                allInputNodesOfLUTs.add(Node.getNode(neighborTile, wireName));
+            }
+        }
+
+        List<Node> allNodesReachedByBNodes = new ArrayList<>();
+        allNodesReachedByBNodes.addAll(Arrays.asList(intTile.getWireNames()).stream()
+            .map(w -> Node.getNode(intTile, w))
+            .filter(n -> {return (n.getIntentCode() == IntentCode.NODE_CLE_BNODE);})
+            .map(n -> n.getAllDownhillNodes())
+            .flatMap(List::stream)
+            .map(n -> n.getAllDownhillNodes())
+            .flatMap(List::stream)
+            .map(n -> n.getAllDownhillNodes())
+            .flatMap(List::stream)
+            .distinct()
+            .collect(Collectors.toList()));
+
+        Assertions.assertTrue(allNodesReachedByBNodes.containsAll(allInputNodesOfLUTs));
+
+        List<Node> allNodesReachedByCNodes = new ArrayList<>();
+        allNodesReachedByCNodes.addAll(Arrays.asList(intTile.getWireNames()).stream()
+            .map(w -> Node.getNode(intTile, w))
+            .filter(n -> {return (n.getIntentCode() == IntentCode.NODE_CLE_CNODE);})
+            .map(n -> n.getAllDownhillNodes())
+            .flatMap(List::stream)
+            .map(n -> n.getAllDownhillNodes())
+            .flatMap(List::stream)
+            .map(n -> n.getAllDownhillNodes())
+            .flatMap(List::stream)
+            .distinct()
+            .collect(Collectors.toList()));
+
+        Assertions.assertTrue(allNodesReachedByCNodes.containsAll(allInputNodesOfLUTs));
+    }
+
+    static List<Arguments> testBCNodeInINTTileReachAllNeighborLUTInputPinsIn3Steps() {
+        return Arrays.asList(
+            Arguments.of("xcvp1002", 26, 145),
+            Arguments.of("xcvp1002", 26, 147),
+            Arguments.of("xcvp1002", 30, 147),
+            Arguments.of("xcvp1002", 40, 70),
+            Arguments.of("xcvp1002", 15, 70)
+        );
     }
 
     @ParameterizedTest

@@ -223,6 +223,12 @@ public class RWRoute {
             throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
         }
 
+        for (Net net: design.getNets()) {
+            if (!NetTools.isGlobalClock(net) && !net.isStaticNet()) {
+                net.unroute();
+            }
+        }
+
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
@@ -1790,6 +1796,9 @@ public class RWRoute {
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
+                        // if (!routingGraph.isAccessibleNodeInINTTile(rnode, childRNode, connection)) {
+                        //     continue;
+                        // }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
                             // To filter out those nodes that are considered to be excluded with the masking resource approach,
                             // such as U-turn shape nodes near the boundary
