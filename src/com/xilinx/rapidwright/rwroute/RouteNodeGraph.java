@@ -583,33 +583,50 @@ public class RouteNodeGraph {
     }
 
     public boolean isAccessibleNodeInINTTile(RouteNode rnode, RouteNode childRnode, Connection connection) {
-        assert(rnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-        assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+        // These assertions do not hold for non-CLE connections (e.g. IOB, BRAM, DSP, etc.)
+        // assert(rnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+        // assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
 
         // Below situations should not be skipped
         if (design.getSeries() != Series.Versal) {
             return true;
         }
-        if (rnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            return true;
-        }
-        Tile sinkTile = connection.getSinkRnode().getTile();
-        TileTypeEnum sinkTileType = sinkTile.getTileTypeEnum();
-        if (sinkTileType != TileTypeEnum.CLE_W_CORE && sinkTileType != TileTypeEnum.CLE_E_CORE) {
-            return true;
-        }
-        if (rnode.getTile().getTileXCoordinate() != sinkTile.getTileXCoordinate()) {
-            return true;
-        }
-        if (rnode.getTile().getTileYCoordinate() != sinkTile.getTileYCoordinate()) {
-            return true;
+
+
+        RouteNode sinkRnode = connection.getSinkRnode();
+        Tile sinkTile = sinkRnode.getTile();
+        IntentCode childIntentCode = childRnode.getIntentCode();
+        switch (childIntentCode) {
+            case NODE_INODE:
+                // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE _> NODE_PINBOUNCE)
+                if (childRnode.getTile() != sinkTile) {
+                    return false;
+                }
+                assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                break;
+            case NODE_CLE_CNODE:
+                // Block access to all CNODEs outside the sink tile, since NODE_CLE_CNODE -> NODE_CLE_CTRL
+                if (childRnode.getTile() != sinkTile) {
+                    return false;
+                }
+                assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL);
+                break;
+            case NODE_INTF_CNODE:
+                // Block access to all CNODEs outside the sink tile, since NODE_INTF_CNODE -> NODE_INTF_CTRL
+                if (childRnode.getTile() != sinkTile) {
+                    return false;
+                }
+                assert(sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+                break;
+            default:
+                break;
         }
 
-        // If rnode is already in the INT tile, next step should be INODE/IMUX node
-        if (rnode.getIntentCode() != IntentCode.NODE_INODE && childRnode.getIntentCode() != IntentCode.NODE_INODE) {
-            return false;
-        }
-
+        // TODO: Do we want to block NODE_PINBOUNCE if not in the sink INT tile?
+        // TODO: Do we want to block all exploration of TileTypeEnum.CLE_BC_CORE and TileTypeEnum.INTF_[LR]OCF_[TB][LR]_TILE
+        //       unless our sink is in that tile? (or is this alrady done by NODE_{CLE,INTF}_CNODE blocking above)
+        // TODO: Is there any value in blocking NODE_{CLE,INTF}_BNODEs?
+        // TODO: What's special about nodes with wirename INT/OUT_[NESW]NODE_[EW]_*?
         return true;
     }
 
