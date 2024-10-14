@@ -181,10 +181,10 @@ public class RWRoute {
     public static final EnumSet<Series> SUPPORTED_SERIES;
 
     static {
-        SUPPORTED_SERIES = EnumSet.noneOf(Series.class);
-        SUPPORTED_SERIES.add(Series.UltraScale);
-        SUPPORTED_SERIES.add(Series.UltraScalePlus);
-        SUPPORTED_SERIES.add(Series.Versal);
+        SUPPORTED_SERIES = EnumSet.of(
+                Series.UltraScale,
+                Series.UltraScalePlus,
+                Series.Versal);
     }
 
     public RWRoute(Design design, RWRouteConfig config) {
@@ -254,7 +254,6 @@ public class RWRoute {
         if (config.isTimingDriven()) {
             nodesDelays = new HashMap<>();
         }
-        rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
         lutPinSwapping = config.isLutPinSwapping();
@@ -499,6 +498,9 @@ public class RWRoute {
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
             staticNet.unroute();
+            // Remove all output pins from unouted net as those used will be repopulated
+            staticNet.getPins().removeIf(SitePinInst::isOutPin);
+
             // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
             preserveNet(staticNet, true);
             staticNetAndRoutingTargets.put(staticNet, sinks);
@@ -841,7 +843,7 @@ public class RWRoute {
     public void routeIndirectConnectionsIteratively() {
         sortConnections();
         initializeRouting();
-        long lastIterationRnodeCount = 0;
+        long lastIterationRnodeCount = routingGraph.numNodes();
         long lastIterationRnodeTime = 0;
 
         boolean initialHus = this.hus;
@@ -1307,16 +1309,15 @@ public class RWRoute {
         Set<Node> netNodes = new HashSet<>();
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
-            for (Connection connection:netWrapper.getConnections()) {
+            for (Connection connection : netWrapper.getConnections()) {
                 if (connection.getNodes() == null) {
                     continue;
                 }
                     
                 netNodes.addAll(connection.getNodes());
             }
-            for (Node node:netNodes) {
-                TileTypeEnum tileType = node.getTile().getTileTypeEnum();
-                if (tileType != TileTypeEnum.INT && !Utils.isLaguna(tileType)) {
+            for (Node node : netNodes) {
+                if (RouteNodeGraph.isExcludedTile(node)) {
                     continue;
                 }
                 totalINTNodes++;
@@ -1329,40 +1330,45 @@ public class RWRoute {
         }
     }
 
-    static List<IntentCode> nodeTypes = new ArrayList<>();
+    static List<IntentCode> nodeUsageForUltraScale = new ArrayList<>();
     static {
-        nodeTypes.add(IntentCode.NODE_SINGLE);
-        nodeTypes.add(IntentCode.NODE_DOUBLE);
-        nodeTypes.add(IntentCode.NODE_VQUAD);
-        nodeTypes.add(IntentCode.NODE_HQUAD);
-        nodeTypes.add(IntentCode.NODE_VLONG);
-        nodeTypes.add(IntentCode.NODE_HLONG);
-        nodeTypes.add(IntentCode.NODE_LOCAL);
-        nodeTypes.add(IntentCode.NODE_PINBOUNCE);
-        nodeTypes.add(IntentCode.NODE_PINFEED);
-        nodeTypes.add(IntentCode.NODE_LAGUNA_DATA); // UltraScale+ only
+        nodeUsageForUltraScale.add(IntentCode.NODE_SINGLE);
+        nodeUsageForUltraScale.add(IntentCode.NODE_DOUBLE);
+        nodeUsageForUltraScale.add(IntentCode.NODE_VQUAD);
+        nodeUsageForUltraScale.add(IntentCode.NODE_HQUAD);
+        nodeUsageForUltraScale.add(IntentCode.NODE_VLONG);
+        nodeUsageForUltraScale.add(IntentCode.NODE_HLONG);
+        nodeUsageForUltraScale.add(IntentCode.NODE_LOCAL);
+        nodeUsageForUltraScale.add(IntentCode.NODE_PINBOUNCE);
+        nodeUsageForUltraScale.add(IntentCode.NODE_PINFEED);
+        nodeUsageForUltraScale.add(IntentCode.NODE_LAGUNA_DATA); // UltraScale+ only intent code,
+                                                                 // but super long lines from UltraScale (which have
+                                                                 // IntentCode.INTENT_DEFAULT are mapped to this)
     }
 
-    static List<IntentCode> nodeTypesOnVersalDevice = new ArrayList<>();
+    static List<IntentCode> nodeUsageForVersal = new ArrayList<>();
     static {
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_VSINGLE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_HSINGLE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_VDOUBLE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_HDOUBLE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_VQUAD);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_HQUAD);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_VLONG7);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_VLONG12);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_HLONG6);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_HLONG10);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_CLE_BNODE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_INTF_BNODE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_CLE_CNODE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_INTF_CNODE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_LOCAL);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_PINBOUNCE);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_PINFEED);
-        nodeTypesOnVersalDevice.add(IntentCode.NODE_LAGUNA_DATA);
+        nodeUsageForVersal.add(IntentCode.NODE_VSINGLE);
+        nodeUsageForVersal.add(IntentCode.NODE_HSINGLE);
+        nodeUsageForVersal.add(IntentCode.NODE_VDOUBLE);
+        nodeUsageForVersal.add(IntentCode.NODE_HDOUBLE);
+        nodeUsageForVersal.add(IntentCode.NODE_VQUAD);
+        nodeUsageForVersal.add(IntentCode.NODE_HQUAD);
+        nodeUsageForVersal.add(IntentCode.NODE_VLONG7);
+        nodeUsageForVersal.add(IntentCode.NODE_VLONG12);
+        nodeUsageForVersal.add(IntentCode.NODE_HLONG6);
+        nodeUsageForVersal.add(IntentCode.NODE_HLONG10);
+        nodeUsageForVersal.add(IntentCode.NODE_CLE_BNODE);
+        nodeUsageForVersal.add(IntentCode.NODE_INTF_BNODE);
+        nodeUsageForVersal.add(IntentCode.NODE_CLE_CNODE);
+        nodeUsageForVersal.add(IntentCode.NODE_INTF_CNODE);
+        nodeUsageForVersal.add(IntentCode.NODE_PINBOUNCE);
+        nodeUsageForVersal.add(IntentCode.NODE_IMUX);
+        // NODE_PINFEED exists on Versal but is behind a NODE_IMUX
+        // and gets projectInputPinToINTNode() -ed away
+
+        // TODO: Enable when SLR crossings are supported
+        // nodeUsageForVersal.add(IntentCode.NODE_SLL_DATA);
     }
 
     /**
@@ -1506,7 +1512,13 @@ public class RWRoute {
                     if (pip.isRouteThru()) {
                         continue;
                     }
-                    SitePin sp = pip.getStartNode().getSitePin();
+                    Node startNode = pip.getStartNode();
+                    IntentCode startIntent = startNode.getIntentCode();
+                    if (startIntent != IntentCode.NODE_CLE_OUTPUT &&  // US+ and Versal
+                            startIntent != IntentCode.NODE_OUTPUT) {  // US
+                        continue;
+                    }
+                    SitePin sp = startNode.getSitePin();
                     if (sp.getPinName().equals(source.getName())) {
                         pip.setIsLogicalDriver(true);
                         break;
@@ -2087,7 +2099,7 @@ public class RWRoute {
         if (verbose) {
             System.out.println("Node Usage Per Type");
             System.out.printf(" %-16s  %13s  %12s\n", "Node Type", "Usage", "Length");
-            List<IntentCode> nodeTypeList = series == Series.Versal ? nodeTypesOnVersalDevice : nodeTypes;
+            List<IntentCode> nodeTypeList = (series == Series.Versal) ? nodeUsageForVersal : nodeUsageForUltraScale;
             for (IntentCode ic : nodeTypeList) {
                 long usage = nodeTypeUsage.getOrDefault(ic, 0L);
                 long length = nodeTypeLength.getOrDefault(ic, 0L);

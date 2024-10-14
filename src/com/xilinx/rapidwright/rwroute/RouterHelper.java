@@ -145,28 +145,23 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
+        Node source = output.getConnectedNode();
         int watchdog = 20;
 
-        // Starting from the SPI's connected node, for each node in queue
-        // return the first downhill node that is in an Interconnect tile.
-        // Otherwise, restart the queue with all such downhill nodes and repeat.
-        // No backtracking.
+        // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
-        queue.add(output.getConnectedNode());
+        queue.add(source);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
-            assert(!Utils.isInterConnect(node.getTile().getTileTypeEnum()));
-
-            List<Node> downhillNodes = node.getAllDownhillNodes();
-            if (downhillNodes.isEmpty()) {
-                continue;
-            }
-
-            queue.clear();
-            for (Node downhill : downhillNodes) {
-                if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+            for (Node downhill : node.getAllDownhillNodes()) {
+                TileTypeEnum downhillTileType = downhill.getTile().getTileTypeEnum();
+                if (Utils.isInterConnect(downhillTileType)) {
+                    // Return node that has at least one downhill in the INT tile
                     return node;
+                }
+                if (Utils.isClocking(downhillTileType)) {
+                    continue;
                 }
                 queue.add(downhill);
             }
@@ -182,26 +177,28 @@ public class RouterHelper {
      */
     public static Node projectInputPinToINTNode(SitePinInst input) {
         Node sink = input.getConnectedNode();
-        Queue<Node> q = new LinkedList<>();
-        q.add(sink);
-        int watchdog = 1000;
-        while (!q.isEmpty()) {
-            Node n = q.poll();
-            TileTypeEnum tileType = n.getTile().getTileTypeEnum();
-            if (tileType == TileTypeEnum.INT ||
-                // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
-                EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(n.getIntentCode())) {
-                return n;
-            }
-            for (Node uphill : n.getAllUphillNodes()) {
-                if (uphill.getAllUphillNodes().size() == 0) {
+        if (sink.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            return sink;
+        }
+        int watchdog = 40;
+
+        // Starting from the SPI's connected node, perform an uphill breadth-first search
+        Queue<Node> queue = new ArrayDeque<>();
+        queue.add(sink);
+        while (!queue.isEmpty() && watchdog >= 0) {
+            Node node = queue.poll();
+            watchdog--;
+            for (Node uphill : node.getAllUphillNodes()) {
+                TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
+                if (uphillTileType == TileTypeEnum.INT ||
+                        // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
+                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
+                    return uphill;
+                }
+                if (Utils.isClocking(uphillTileType)) {
                     continue;
                 }
-                q.add(uphill);
-            }
-            watchdog--;
-            if (watchdog < 0) {
-                break;
+                queue.add(uphill);
             }
         }
 
@@ -393,6 +390,9 @@ public class RouterHelper {
         nextSitePin: for (SitePinInst spi : pins) {
             if (!spi.getNet().equals(gndNet))
                 throw new RuntimeException(spi.toString());
+            if (spi.isOutPin()) {
+                continue;
+            }
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
@@ -474,10 +474,10 @@ public class RouterHelper {
                     if (!belPin.getBEL().canInvert()) {
                         continue;
                     }
-                    if (spi.getSite().getName().startsWith("RAM")) {
-                        if (belPin.getBELName().startsWith("CLK")) {
-                            continue;
-                        }
+                    // Emulate Vivado's behaviour and do not invert CLK* site pins
+                    if (Utils.isBRAM(spi.getSiteInst()) &&
+                            belPin.getBELName().startsWith("CLK")) {
+                        continue;
                     }
                     toInvertPins.add(spi);
                 }

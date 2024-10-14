@@ -193,6 +193,8 @@ public class RouteNodeGraph {
         accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
 
         if (lutRoutethru) {
+            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+
             muxWires = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
                 Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
@@ -402,7 +404,7 @@ public class RouteNodeGraph {
         allowedTileEnums.add(TileTypeEnum.INT);
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
 
-        // Versal only
+        // Versal only: include tiles hosting BNODE/CNODEs
         allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
@@ -414,7 +416,7 @@ public class RouteNodeGraph {
         allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BR_TILE);
     }
 
-    protected boolean isExcludedTile(Node child) {
+    public static boolean isExcludedTile(Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
@@ -532,7 +534,17 @@ public class RouteNodeGraph {
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        return new RouteNode(this, node, type);
+        RouteNode rnode = new RouteNode(this, node, type);
+        // PINFEED_I should have zero length, except for on US/US+ where the PINFEED_I is a PINBOUNCE node.
+        assert(rnode.getType() != RouteNodeType.PINFEED_I ||
+                rnode.getLength() == 0 ||
+                (rnode.getLength() == 1 && (design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus) &&
+                        rnode.getIntentCode() == IntentCode.NODE_PINBOUNCE));
+        // PINBOUNCE should have zero length, except for on US/US+
+        assert(rnode.getType() != RouteNodeType.PINBOUNCE ||
+                rnode.getLength() == 0 ||
+                (rnode.getLength() == 1 && design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus));
+        return rnode;
     }
 
     public RouteNode getOrCreate(Node node) {
