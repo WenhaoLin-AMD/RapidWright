@@ -206,12 +206,17 @@ public class TestNode {
 
     static List<Arguments> testLUTNodeReachabilityVersal() {
         return List.of(
-            Arguments.of("xcvp1002", "CLE_E_CORE_X27Y145", IntentCode.NODE_PINFEED),
-            Arguments.of("xcvp1002", "CLE_W_CORE_X26Y145", IntentCode.NODE_PINFEED),
-            Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_BNODE),
-            Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_BNODE),
-            Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_CNODE),
-            Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_CNODE)
+            Arguments.of("xcvp1002", "CLE_BC_CORE_X10Y222", IntentCode.NODE_CLE_CNODE),
+            Arguments.of("xcvp1002", "CLE_BC_CORE_X10Y222", IntentCode.NODE_CLE_CTRL),
+            Arguments.of("xcvp1002", "CLE_BC_CORE_X10Y222", IntentCode.NODE_CLE_BNODE),
+            Arguments.of("xcvp1002", "CLE_W_CORE_X10Y222", IntentCode.NODE_PINFEED),
+            Arguments.of("xcvp1002", "CLE_E_CORE_X11Y222", IntentCode.NODE_CLE_OUTPUT),
+            Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_SDQNODE)
+            // Arguments.of("xcvp1002", "CLE_W_CORE_X26Y145", IntentCode.NODE_PINFEED)
+            // Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_BNODE),
+            // Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_BNODE),
+            // Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_CNODE),
+            // Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_CNODE)
         );
     }
 
