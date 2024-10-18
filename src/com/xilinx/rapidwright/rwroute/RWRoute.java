@@ -223,6 +223,12 @@ public class RWRoute {
             throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
         }
 
+        for (Net net: design.getNets()) {
+            if (!NetTools.isGlobalClock(net) && !net.isStaticNet()) {
+                net.unroute();
+            }
+        }
+
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
