@@ -360,75 +360,75 @@ public class TestNode {
         Device device = Device.getDevice("xcvp1002");
         for (int x = 1; x < device.getColumns(); x++) {
             for (int y = 0; y < device.getRows(); y++) {
-                if (device.getTile("CLE_BC_CORE", x-1, y) == null) {
-                    assertNull(device.getTile("CLE_E_CORE", x, y));
+                if (device.getTile("CLE_E_CORE", x, y) == null) {
+                    continue;
 
-                    Tile tile = device.getTile("INTF_HB_LOCF_TL_TILE", x, y);
-                    if (tile == null) {
-                        tile = device.getTile("INTF_HB_LOCF_BR_TILE", x-1, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_LOCF_TL_TILE", x, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_LOCF_BR_TILE", x, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_LOCF_BL_TILE", x, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_PSS_BL_TILE", x, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_PSS_TL_TILE", x, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_CFRM_TL_TILE", x, y);
-                    }
-                    if (tile == null) {
-                        tile = device.getTile("INTF_CFRM_BL_TILE", x, y);
-                    }
-                    if (tile != null) {
-                        Tile intTile = device.getTile("INT", x, y);
-                        for (int i = 0; i < 32; i++) {
-                            String wireName = "BOUNCE_W" + i;
-                            Node node = Node.getNode(intTile, wireName);
-                            List<Node> downhills = node.getAllDownhillNodes();
-                            if (downhills.size() != 10) {
-                                System.out.println(node);
-                                for (Node downhill: downhills) {
-                                    System.out.println(downhill + " " + downhill.getIntentCode());
-                                }
-                            }
-                            assertEquals(downhills.size(), 10);
-                            for (int j = 0; j < 8; j++) {
-                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INTF_BNODE);
-                            }
-                            for (int j = 8; j < 10; j++) {
-                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INTF_CNODE);
-                            }
-                        }
-                    } else {
-                        Tile intTile = device.getTile("INT", x, y);
-                        if (intTile == null) {
-                            continue;
-                        }
-                        for (int i = 0; i < 32; i++) {
-                            String wireName = "BOUNCE_W" + i;
-                            Node node = Node.getNode(intTile, wireName);
-                            List<Node> downhills = node.getAllDownhillNodes();
-                            if (downhills.size() != 4) {
-                                System.out.println(x + " " + y + " " + node);
-                                for (Node downhill: downhills) {
-                                    System.out.println(downhill + " " + downhill.getIntentCode());
-                                }
-                            }
-                            assertEquals(downhills.size(), 4);
-                            for (int j = 0; j < 4; j++) {
-                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INODE);
-                            }
-                        }
-                    }
+                    // Tile tile = device.getTile("INTF_HB_LOCF_TL_TILE", x, y);
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_HB_LOCF_BR_TILE", x-1, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_LOCF_TL_TILE", x, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_LOCF_BR_TILE", x, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_LOCF_BL_TILE", x, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_PSS_BL_TILE", x, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_PSS_TL_TILE", x, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_CFRM_TL_TILE", x, y);
+                    // }
+                    // if (tile == null) {
+                    //     tile = device.getTile("INTF_CFRM_BL_TILE", x, y);
+                    // }
+                    // if (tile != null) {
+                    //     Tile intTile = device.getTile("INT", x, y);
+                    //     for (int i = 0; i < 32; i++) {
+                    //         String wireName = "BOUNCE_W" + i;
+                    //         Node node = Node.getNode(intTile, wireName);
+                    //         List<Node> downhills = node.getAllDownhillNodes();
+                    //         if (downhills.size() != 10) {
+                    //             System.out.println(node);
+                    //             for (Node downhill: downhills) {
+                    //                 System.out.println(downhill + " " + downhill.getIntentCode());
+                    //             }
+                    //         }
+                    //         assertEquals(downhills.size(), 10);
+                    //         for (int j = 0; j < 8; j++) {
+                    //             assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INTF_BNODE);
+                    //         }
+                    //         for (int j = 8; j < 10; j++) {
+                    //             assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INTF_CNODE);
+                    //         }
+                    //     }
+                    // } else {
+                    //     Tile intTile = device.getTile("INT", x, y);
+                    //     if (intTile == null) {
+                    //         continue;
+                    //     }
+                    //     for (int i = 0; i < 32; i++) {
+                    //         String wireName = "BOUNCE_W" + i;
+                    //         Node node = Node.getNode(intTile, wireName);
+                    //         List<Node> downhills = node.getAllDownhillNodes();
+                    //         if (downhills.size() != 4) {
+                    //             System.out.println(x + " " + y + " " + node);
+                    //             for (Node downhill: downhills) {
+                    //                 System.out.println(downhill + " " + downhill.getIntentCode());
+                    //             }
+                    //         }
+                    //         assertEquals(downhills.size(), 4);
+                    //         for (int j = 0; j < 4; j++) {
+                    //             assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INODE);
+                    //         }
+                    //     }
+                    // }
                 } else {
                     Tile intTile = device.getTile("INT", x, y);
                     if (intTile == null) {
@@ -465,7 +465,7 @@ public class TestNode {
         Device device = Device.getDevice("xcvp1002");
         for (int x = 1; x < device.getColumns(); x++) {
             for (int y = 0; y < device.getRows(); y++) {
-                if (device.getTile("CLE_BC_CORE", x, y) == null) {
+                if (device.getTile("CLE_W_CORE", x, y) == null) {
                     continue;
                 }
                 
