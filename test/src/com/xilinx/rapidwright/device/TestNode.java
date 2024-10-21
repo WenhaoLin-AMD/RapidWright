@@ -22,11 +22,15 @@
 
 package com.xilinx.rapidwright.device;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -160,6 +164,60 @@ public class TestNode {
         System.out.println("visited.size() = " + visited.size());
     }
 
+    @Test
+    public void testSDQNodeReachabilityVersal() {
+        String partName = "xcvp1002";
+        String tileName = "INT_X26Y145";
+        System.out.println("----------------------------------------" );
+        System.out.println("Testing: " + partName + " " + tileName);
+        Device device = Device.getDevice(partName);
+        Tile baseTile = device.getTile(tileName);
+        Queue<Node> queue = new ArrayDeque<>();
+
+        for (String wireName : baseTile.getWireNames()) {
+            Node node = Node.getNode(baseTile, wireName);
+            if (node.getIntentCode() != IntentCode.NODE_SDQNODE || !wireName.startsWith("OUT")) {
+                continue;
+            }
+            queue.add(node);
+        }
+        System.out.println("OUT* queue.size() = " + queue.size());
+
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        queue.clear();
+        for (String wireName : baseTile.getWireNames()) {
+            Node node = Node.getNode(baseTile, wireName);
+            if (node.getIntentCode() != IntentCode.NODE_SDQNODE || !wireName.startsWith("INT")) {
+                continue;
+            }
+            queue.add(node);
+        }
+        System.out.println("INT* queue.size() = " + queue.size());
+
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+    }
+
     @ParameterizedTest
     @MethodSource
     public void testLUTNodeReachabilityVersal(String partName, String tileName, IntentCode ic) {
@@ -191,6 +249,18 @@ public class TestNode {
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
 
+        System.out.println("2-step uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        System.out.println("3-step uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
         System.out.println("Immediately downhill:");
         queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
                 .distinct()
@@ -199,6 +269,12 @@ public class TestNode {
 
         System.out.println("2-step downhill:");
         queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        System.out.println("3-step downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
@@ -218,6 +294,234 @@ public class TestNode {
             // Arguments.of("xcvp1002", "INT_X26Y145", IntentCode.NODE_CLE_CNODE),
             // Arguments.of("xcvp1002", "INT_X30Y120", IntentCode.NODE_CLE_CNODE)
         );
+    }
+
+    @Test
+    public void testCKENCTRLFedByOnlyCNODEOnVersal() {
+        Device device = Device.getDevice("xcvp1002");
+        for (int x = 1; x < device.getColumns(); x++) {
+            for (int y = 0; y < device.getRows(); y++) {
+                Tile tile = device.getTile("CLE_BC_CORE", x, y);
+                if (tile == null) {
+                    continue;
+                }
+                for (String wireName: tile.getWireNames()) {
+                    if (!wireName.startsWith("CTRL") || wireName.endsWith("B8")) {
+                        // B8 connects to pin WE, which is fed by BNODEs and CNODEs
+                        continue;
+                    }
+                    Node node = Node.getNode(tile, wireName);
+                    IntentCode ic = node.getIntentCode();
+                    Assertions.assertTrue(ic == IntentCode.NODE_CLE_CTRL);
+                    for (Node uphill: node.getAllUphillNodes()) {
+                        boolean condition = uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getWireName().equals("VCC_WIRE");
+                        if (condition == false) {
+                            System.out.println(node + " " + uphill.getIntentCode() + " " + uphill.getWireName());
+                        }
+                        // Assertions.assertTrue(condition);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testCTRLFedByBNODEAndCNODEOnVersal() {
+        Device device = Device.getDevice("xcvp1002");
+        for (int x = 1; x < device.getColumns(); x++) {
+            for (int y = 0; y < device.getRows(); y++) {
+                Tile tile = device.getTile("CLE_BC_CORE", x, y);
+                if (tile == null) {
+                    continue;
+                }
+                for (String wireName: tile.getWireNames()) {
+                    if (!wireName.startsWith("CTRL")) {
+                        continue;
+                    }
+                    Node node = Node.getNode(tile, wireName);
+                    IntentCode ic = node.getIntentCode();
+                    Assertions.assertTrue(ic == IntentCode.NODE_CLE_CTRL);
+                    for (Node uphill: node.getAllUphillNodes()) {
+                        boolean condition = uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getWireName().equals("VCC_WIRE");
+                        if (condition == false) {
+                            System.out.println(node + " " + uphill.getIntentCode() + " " + uphill.getWireName());
+                        }
+                        Assertions.assertTrue(condition);
+                    }
+                }
+            }
+        }
+    }
+
+    // @ParameterizedTest
+    // @MethodSource
+    @Test
+    public void testBOUNCEWNodesOnVersal() {
+        Device device = Device.getDevice("xcvp1002");
+        for (int x = 1; x < device.getColumns(); x++) {
+            for (int y = 0; y < device.getRows(); y++) {
+                if (device.getTile("CLE_BC_CORE", x-1, y) == null) {
+                    assertNull(device.getTile("CLE_E_CORE", x, y));
+
+                    Tile tile = device.getTile("INTF_HB_LOCF_TL_TILE", x, y);
+                    if (tile == null) {
+                        tile = device.getTile("INTF_HB_LOCF_BR_TILE", x-1, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_LOCF_TL_TILE", x, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_LOCF_BR_TILE", x, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_LOCF_BL_TILE", x, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_PSS_BL_TILE", x, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_PSS_TL_TILE", x, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_CFRM_TL_TILE", x, y);
+                    }
+                    if (tile == null) {
+                        tile = device.getTile("INTF_CFRM_BL_TILE", x, y);
+                    }
+                    if (tile != null) {
+                        Tile intTile = device.getTile("INT", x, y);
+                        for (int i = 0; i < 32; i++) {
+                            String wireName = "BOUNCE_W" + i;
+                            Node node = Node.getNode(intTile, wireName);
+                            List<Node> downhills = node.getAllDownhillNodes();
+                            if (downhills.size() != 10) {
+                                System.out.println(node);
+                                for (Node downhill: downhills) {
+                                    System.out.println(downhill + " " + downhill.getIntentCode());
+                                }
+                            }
+                            assertEquals(downhills.size(), 10);
+                            for (int j = 0; j < 8; j++) {
+                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INTF_BNODE);
+                            }
+                            for (int j = 8; j < 10; j++) {
+                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INTF_CNODE);
+                            }
+                        }
+                    } else {
+                        Tile intTile = device.getTile("INT", x, y);
+                        if (intTile == null) {
+                            continue;
+                        }
+                        for (int i = 0; i < 32; i++) {
+                            String wireName = "BOUNCE_W" + i;
+                            Node node = Node.getNode(intTile, wireName);
+                            List<Node> downhills = node.getAllDownhillNodes();
+                            if (downhills.size() != 4) {
+                                System.out.println(x + " " + y + " " + node);
+                                for (Node downhill: downhills) {
+                                    System.out.println(downhill + " " + downhill.getIntentCode());
+                                }
+                            }
+                            assertEquals(downhills.size(), 4);
+                            for (int j = 0; j < 4; j++) {
+                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INODE);
+                            }
+                        }
+                    }
+                } else {
+                    Tile intTile = device.getTile("INT", x, y);
+                    if (intTile == null) {
+                        continue;
+                    }
+                    for (int i = 0; i < 32; i++) {
+                        String wireName = "BOUNCE_W" + i;
+                        Node node = Node.getNode(intTile, wireName);
+                        List<Node> downhills = node.getAllDownhillNodes();
+                        if (i < 16) {
+                            assertEquals(downhills.size(), 5);
+                            assertEquals(downhills.get(0).getIntentCode(), IntentCode.NODE_PINFEED);
+                            for (int j = 1; j < 5; j++) {
+                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INODE);
+                            }
+                        } else {
+                            assertEquals(downhills.size(), 11);
+                            for (int j = 0; j < 8; j++) {
+                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_CLE_BNODE);
+                            }
+                            for (int j = 8; j < 10; j++) {
+                                assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_CLE_CNODE);
+                            }
+                            assertEquals(downhills.get(10).getIntentCode(), IntentCode.NODE_PINFEED);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testBOUNCEENodesOnVersal() {
+        Device device = Device.getDevice("xcvp1002");
+        for (int x = 1; x < device.getColumns(); x++) {
+            for (int y = 0; y < device.getRows(); y++) {
+                if (device.getTile("CLE_BC_CORE", x, y) == null) {
+                    continue;
+                }
+                
+                Tile intTile = device.getTile("INT", x, y);
+                if (intTile == null) {
+                    continue;
+                }
+                for (int i = 0; i < 32; i++) {
+                    String wireName = "BOUNCE_E" + i;
+                    Node node = Node.getNode(intTile, wireName);
+                    List<Node> downhills = node.getAllDownhillNodes();
+                    if (i < 16) {
+                        for (int j = 0; j < 4; j++) {
+                            if (downhills.get(j).getIntentCode() != IntentCode.NODE_INODE) {
+                                System.out.println(node);
+                                for (Node downhill: downhills) {
+                                    System.out.println(downhill + " " + downhill.getIntentCode());
+                                }
+                            }
+                            assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_INODE);
+                        }
+                        if (downhills.size() == 5)
+                            assertEquals(downhills.get(4).getIntentCode(), IntentCode.NODE_PINFEED);
+                    } else {
+                        int offset = downhills.size() == 11 ? 1 : 0;
+                        // if (downhills.size() != 11) {
+                        //     System.out.println(node);
+                        //     for (Node downhill: downhills) {
+                        //         System.out.println(downhill + " " + downhill.getIntentCode());
+                        //     }
+                        // }
+                        // assertEquals(downhills.size(), 11);
+                        if (offset == 1) {
+                            assertEquals(downhills.get(0).getIntentCode(), IntentCode.NODE_PINFEED);
+                        }
+                        for (int j = offset; j < offset + 8; j++) {
+                            assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_CLE_BNODE);
+                        }
+                        for (int j = offset + 8; j < offset + 10; j++) {
+                            assertEquals(downhills.get(j).getIntentCode(), IntentCode.NODE_CLE_CNODE);
+                        }
+                        
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testCLEBCCORE() {
+        Device device = Device.getDevice("xcvp1002");
+        // tile name in Vivado: CLE_BC_CORE_1_X14Y0
+        Tile bcmxTile = device.getTile("CLE_BC_CORE", 14, 0);
+        System.out.println(bcmxTile + " " + bcmxTile.getTileTypeEnum());
+        Tile bcTile = device.getTile("CLE_BC_CORE", 14, 192);
+        System.out.println(bcTile + " " + bcTile.getTileTypeEnum());
     }
 
     @ParameterizedTest
