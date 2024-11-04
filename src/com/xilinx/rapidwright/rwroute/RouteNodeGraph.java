@@ -594,16 +594,11 @@ public class RouteNodeGraph {
         return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
-    public boolean isAccessibleNodeInINTTile(RouteNode rnode, RouteNode childRnode, Connection connection) {
-        // These assertions do not hold for non-CLE connections (e.g. IOB, BRAM, DSP, etc.)
-        // assert(rnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-        // assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-
+    public boolean isAccessibleINODEAndCNODEOnVersal(RouteNode rnode, RouteNode childRnode, Connection connection){
         // Below situations should not be skipped
         if (design.getSeries() != Series.Versal) {
             return true;
         }
-
 
         RouteNode sinkRnode = connection.getSinkRnode();
         Tile sinkTile = sinkRnode.getTile();
@@ -635,10 +630,20 @@ public class RouteNodeGraph {
         }
 
         // TODO: Do we want to block NODE_PINBOUNCE if not in the sink INT tile?
+        // We have already blocked them in RWRoute.isAccessiblePinbounce.
+
         // TODO: Do we want to block all exploration of TileTypeEnum.CLE_BC_CORE and TileTypeEnum.INTF_[LR]OCF_[TB][LR]_TILE
-        //       unless our sink is in that tile? (or is this alrady done by NODE_{CLE,INTF}_CNODE blocking above)
+        //       unless our sink is in that tile? (or is this already done by NODE_{CLE,INTF}_CNODE blocking above)
+        // No, we also need to take those neighbor CLE_BC_CORE tiles of the source tile. 
+        // Furthermore, even if we don't take them into consideration, this is done by blocking CNODEs and BNODEs.
+
         // TODO: Is there any value in blocking NODE_{CLE,INTF}_BNODEs?
+        // We have already done this. Here is an invariant that NODE_{CLE, INTF}_BNODE -> {NODE_INODE, NODE_CLE_CTRL},
+        // where NODE_CLE_CTRL must be a node that connects to the sink control pin.
+        // Since the sink rnode must not be the target, we only have INODEs here. However, those INODEs not located in the sink tile have been blocked.
+
         // TODO: What's special about nodes with wirename INT/OUT_[NESW]NODE_[EW]_*?
+        // Nothing special is found yet.
         return true;
     }
 

@@ -1808,7 +1808,7 @@ public class RWRoute {
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
-                        if (!routingGraph.isAccessibleNodeInINTTile(rnode, childRNode, connection)) {
+                        if (!routingGraph.isAccessibleINODEAndCNODEOnVersal(rnode, childRNode, connection)) {
                             continue;
                         }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
