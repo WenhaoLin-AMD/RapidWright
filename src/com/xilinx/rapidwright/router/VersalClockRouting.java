@@ -398,7 +398,8 @@ public class VersalClockRouting {
             IntentCode.NODE_GLOBAL_HDISTR,
             IntentCode.NODE_GLOBAL_VDISTR,
             IntentCode.NODE_PINFEED,
-            IntentCode.NODE_GLOBAL_HDISTR_LOCAL
+            IntentCode.NODE_GLOBAL_HDISTR_LOCAL,
+            IntentCode.NODE_GLOBAL_GCLK
         );
         // nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
         nextClockRegion: for (ClockRegion targetCR : clockRegions) {
@@ -414,8 +415,12 @@ public class VersalClockRouting {
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
                 IntentCode c = curr.getIntentCode();
-                if (targetCR.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
-                    List<PIP> pips = curr.getPIPsBackToSource();
+                Node currNode = Node.getNode(curr);
+                RouteNode parent = curr.getParent();
+                if (targetCR.equals(curr.getTile().getClockRegion()) && 
+                    c == IntentCode.NODE_GLOBAL_GCLK &&
+                    parent.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
+                    List<PIP> pips = parent.getPIPsBackToSource();
                     for (PIP pip : pips) {
                         allPIPs.add(pip);
                         NodeStatus status = getNodeStatus.apply(pip.getStartNode());
@@ -424,17 +429,37 @@ public class VersalClockRouting {
                         }
                         assert(status == NodeStatus.AVAILABLE);
                     }
-                    curr.setParent(null);
-                    distLines.add(curr);
+
+                    parent.setParent(null);
+                    distLines.add(parent);
+                    // List<PIP> pips = curr.getPIPsBackToSource();
+                    // for (PIP pip : pips) {
+                    //     allPIPs.add(pip);
+                    //     NodeStatus status = getNodeStatus.apply(pip.getStartNode());
+                    //     if (status == NodeStatus.INUSE) {
+                    //         break;
+                    //     }
+                    //     assert(status == NodeStatus.AVAILABLE);
+                    // }
+
+                    // curr.setParent(null);
+                    // distLines.add(curr);
                     continue nextClockRegion;
                 }
-                for (Wire w : curr.getWireConnections()) {
-                    // if (!w.getIntentCode().isVersalClocking()) continue;
-                    if (!allowedIntentCodes.contains(w.getIntentCode())) continue;
-                    Node n = Node.getNode(w);
-                    if (visited.contains(n)) continue;
-                    visited.add(n);
-                    q.add(new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1));
+                // for (Wire w : curr.getWireConnections()) {
+                //     // if (!w.getIntentCode().isVersalClocking()) continue;
+                //     if (!allowedIntentCodes.contains(w.getIntentCode())) continue;
+                //     Node n = Node.getNode(w);
+                //     if (visited.contains(n)) continue;
+                //     visited.add(n);
+                //     q.add(new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1));
+                // }
+
+                for (Node downhill: currNode.getAllDownhillNodes()) {
+                    if (!allowedIntentCodes.contains(downhill.getIntentCode())) continue;
+                    if (visited.contains(downhill)) continue;
+                    visited.add(downhill);
+                    q.add(new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1));
                 }
             }
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + targetCR);
