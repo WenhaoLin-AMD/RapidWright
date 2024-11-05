@@ -299,14 +299,14 @@ public class GlobalSignalRouting {
                 System.out.println("vrouteDown: " + vrouteDown + " " + vrouteDown.getTile().getClockRegion());
             }
 
-            List<RouteNode> upDownDistLines = new ArrayList<>();
+            Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
             if (aboveCentroid != null) {
-                List<RouteNode> upLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
-                if (upLines != null) upDownDistLines.addAll(upLines);
+                Map<ClockRegion, RouteNode> upLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+                if (!upLines.isEmpty()) upDownDistLines.putAll(upLines);
             }
 
-            List<RouteNode> downLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-            if (downLines != null) upDownDistLines.addAll(downLines);
+            Map<ClockRegion, RouteNode> downLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            if (!downLines.isEmpty()) upDownDistLines.putAll(downLines);
 
             Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
             VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
