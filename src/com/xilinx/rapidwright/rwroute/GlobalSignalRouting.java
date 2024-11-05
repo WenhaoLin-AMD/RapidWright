@@ -257,9 +257,9 @@ public class GlobalSignalRouting {
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             ClockRegion centroid = findCentroid(clk, device);
 
-            if (debug) {
-                System.out.println("centroid: " + centroid);
-            }
+            // if (debug) {
+            //     System.out.println("centroid: " + centroid);
+            // }
 
             if (debug) {
                 centroid = device.getClockRegion(1, 3);
@@ -274,13 +274,13 @@ public class GlobalSignalRouting {
             RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
 
             if (debug) {
-                System.out.println("clkRoutingLine: " + clkRoutingLine);
+                System.out.println("clkRoutingLine: " + clkRoutingLine + " " + clkRoutingLine.getTile().getClockRegion());
             }
 
             RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
 
             if (debug) {
-                System.out.println("centroidHRouteNode: " + centroidHRouteNode);
+                System.out.println("centroidHRouteNode: " + centroidHRouteNode + " " + centroidHRouteNode.getTile().getClockRegion());
             }
             
             RouteNode vrouteUp = null;
@@ -290,13 +290,13 @@ public class GlobalSignalRouting {
             if (aboveCentroid != null) {
                 vrouteUp = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
                 if (debug) {
-                    System.out.println("vrouteUp: " + vrouteUp);
+                    System.out.println("vrouteUp: " + vrouteUp + " " + vrouteUp.getTile().getClockRegion());
                 }
             }
             vrouteDown = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 
             if (debug) {
-                System.out.println("vrouteDown: " + vrouteDown);
+                System.out.println("vrouteDown: " + vrouteDown + " " + vrouteDown.getTile().getClockRegion());
             }
 
             List<RouteNode> upDownDistLines = new ArrayList<>();

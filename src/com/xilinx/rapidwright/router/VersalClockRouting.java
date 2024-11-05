@@ -20,6 +20,7 @@ import com.xilinx.rapidwright.rwroute.NodeStatus;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -311,6 +312,73 @@ public class VersalClockRouting {
         return crToVdist;
     }
 
+    public static Map<ClockRegion, RouteNode> routeVrouteToVerticalDistributionLines(Net clk,
+                                                                                       RouteNode vroute,
+                                                                                       Collection<ClockRegion> clockRegions,
+                                                                                       Function<Node, NodeStatus> getNodeStatus) {
+        Map<ClockRegion, RouteNode> crToVdist = new HashMap<>();
+        vroute.setParent(null);
+        Queue<RouteNode> q = RouteNode.createPriorityQueue();
+        HashSet<RouteNode> visited = new HashSet<>();
+        Set<PIP> allPIPs = new HashSet<>();
+        Set<RouteNode> startingPoints = new HashSet<>();
+        startingPoints.add(vroute);
+        assert(vroute.getParent() == null);
+        Set<IntentCode> allowedIntentCodes = EnumSet.of(
+            IntentCode.NODE_GLOBAL_VROUTE,
+            IntentCode.NODE_GLOBAL_VDISTR,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL1,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL2,
+            IntentCode.NODE_GLOBAL_GCLK
+        );
+        nextClockRegion: for (ClockRegion cr : clockRegions) {
+            q.clear();
+            visited.clear();
+            q.addAll(startingPoints);
+            Tile crTarget = cr.getApproximateCenter();
+            while (!q.isEmpty()) {
+                RouteNode curr = q.poll();
+                // visited.add(curr);
+                IntentCode c = curr.getIntentCode();
+                ClockRegion currCR = curr.getTile().getClockRegion();
+                if (currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
+                    // Only consider base wires
+                    Node currNode = Node.getNode(curr);
+                    if (getNodeStatus.apply(currNode) == NodeStatus.INUSE) {
+                        startingPoints.add(curr);
+                    } else {
+                        List<PIP> pips = curr.getPIPsBackToSource();
+                        allPIPs.addAll(pips);
+                        for (PIP p : pips) {
+                            startingPoints.add(p.getStartRouteNode());
+                            startingPoints.add(p.getEndRouteNode());
+                        }
+                    }
+                    RouteNode currBase = new RouteNode(currNode);
+                    currBase.setParent(null);
+                    crToVdist.put(cr, currBase);
+                    continue nextClockRegion;
+                }
+                for (Wire w : curr.getWireConnections()) {
+                    // if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
+                    if (w.getTile().getTileTypeEnum() == TileTypeEnum.INVALID_1_10 || !allowedIntentCodes.contains(w.getIntentCode())) {
+                        continue;
+                    }
+                    Node n = Node.getNode(w);
+                    RouteNode rn = new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1);
+                    if (visited.contains(rn)) continue;
+                    rn.setCost(w.getTile().getManhattanDistance(crTarget));
+                    q.add(rn);
+                    visited.add(rn);
+                }
+            }
+            throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
+        }
+        clk.getPIPs().addAll(allPIPs);
+        vroute.setParent(null);
+        return crToVdist;
+    }
+
     /**
      * Routes from a vertical distribution centroid to destination horizontal distribution lines
      * in the clock regions provided.
@@ -319,20 +387,28 @@ public class VersalClockRouting {
      * @return The List of nodes from the centroid to the horizontal distribution line.
      */
     public static List<RouteNode> routeVerticalToHorizontalDistributionLines(Net clk,
-                                                                             Map<Integer, RouteNode> vertDistLines,
+                                                                             Map<ClockRegion, RouteNode> vertDistLines,
                                                                              Collection<ClockRegion> clockRegions,
                                                                              Function<Node, NodeStatus> getNodeStatus) {
         List<RouteNode> distLines = new ArrayList<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<Node> visited = new HashSet<>();
+        Set<IntentCode> allowedIntentCodes = EnumSet.of(
+            IntentCode.NODE_GLOBAL_HDISTR,
+            IntentCode.NODE_GLOBAL_VDISTR,
+            IntentCode.NODE_PINFEED,
+            IntentCode.NODE_GLOBAL_HDISTR_LOCAL
+        );
         // nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
         nextClockRegion: for (ClockRegion targetCR : clockRegions) {
             q.clear();
-            RouteNode vertDistLine = vertDistLines.get(targetCR.getRow());
+            RouteNode vertDistLine = vertDistLines.get(targetCR);
             // assert(vertDistLine.getParent() == null);
             vertDistLine.setParent(null);
             q.add(vertDistLine);
+            visited.clear();
+            visited.add(Node.getNode(vertDistLine));
             
             // ClockRegion targetCR = e.getKey();
             while (!q.isEmpty()) {
@@ -353,8 +429,11 @@ public class VersalClockRouting {
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
-                    if (!w.getIntentCode().isVersalClocking()) continue;
+                    // if (!w.getIntentCode().isVersalClocking()) continue;
+                    if (!allowedIntentCodes.contains(w.getIntentCode())) continue;
                     Node n = Node.getNode(w);
+                    if (visited.contains(n)) continue;
+                    visited.add(n);
                     q.add(new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1));
                 }
             }
@@ -521,25 +600,39 @@ public class VersalClockRouting {
                                                                      boolean down,
                                                                      Function<Node, NodeStatus> getNodeStatus) {
         // RouteNode centroidDistNode = VersalClockRouting.transitionCentroidToVerticalDistributionLine(clk, vroute, down);
-        // System.out.println("centroidDistNode: " + centroidDistNode);
+        // System.out.println("centroidDistNode: " + centroidDistNode + " " + centroidDistNode.getTile().getClockRegion());
         // if (centroidDistNode == null) return null;
 
-        ClockRegion centroidClockRegion = vroute.getTile().getClockRegion();
-        Device device = centroidClockRegion.getDevice();
-        // Y -> vertical distribution line
-        Map<Integer, RouteNode> vertDistLines = new HashMap<>();
-        // Y -> clock regions in the same column
-        // Map<Integer, ClockRegion> clockRegionsOfVertDistLines = new HashMap<>();
-        for (ClockRegion cr: clockRegions) {
-            if (!vertDistLines.containsKey(cr.getRow())) {
-                ClockRegion vDistLineClockRegion = device.getClockRegion(cr.getRow(), centroidClockRegion.getColumn());
-                RouteNode vDistLine = transitionCentroidToDistributionLine(clk, vroute, vDistLineClockRegion);
-                vertDistLines.put(cr.getRow(), vDistLine);
-            }
+        Map<ClockRegion, RouteNode> vertDistLines = routeVrouteToVerticalDistributionLines(clk, vroute, clockRegions, getNodeStatus);
+
+        // ClockRegion centroidClockRegion = vroute.getTile().getClockRegion();
+        // Device device = centroidClockRegion.getDevice();
+        // // Y -> vertical distribution line
+        // Map<ClockRegion, RouteNode> vertDistLines = new HashMap<>();
+        // // Y -> clock regions in the same column
+        // // Map<Integer, ClockRegion> clockRegionsOfVertDistLines = new HashMap<>();
+        // for (ClockRegion cr: clockRegions) {
+        //     RouteNode vDistLine = null;
+        //     for (ClockRegion keyCr: vertDistLines.keySet()) {
+        //         if (cr.getRow() == keyCr.getRow()) {
+        //             vDistLine = vertDistLines.get(keyCr);
+        //             break;
+        //         }
+        //     }
+        //     if (vDistLine == null) {
+        //         // TODO: 
+        //         vDistLine = transitionCentroidToDistributionLine(clk, vroute, vDistLineClockRegion);
+        //     }
+        //     assert(vDistLine != null);
+        //     vertDistLines.put(cr, vDistLine);
+        // }
+
+        for (ClockRegion cr: vertDistLines.keySet()) {
+            RouteNode vDistNode = vertDistLines.get(cr);
+            System.out.println(cr + " " + vDistNode.getName() + " " + vDistNode.getTile().getClockRegion());
         }
 
-        // Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegionsInTheSameColumn, getNodeStatus);
-
+        // TODO: 
         return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
     }
 
