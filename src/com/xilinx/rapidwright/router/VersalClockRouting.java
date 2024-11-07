@@ -319,13 +319,13 @@ public class VersalClockRouting {
         Map<ClockRegion, RouteNode> crToVdist = new HashMap<>();
         vroute.setParent(null);
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
-        HashSet<RouteNode> visited = new HashSet<>();
+        HashSet<Node> visited = new HashSet<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<RouteNode> startingPoints = new HashSet<>();
         startingPoints.add(vroute);
         assert(vroute.getParent() == null);
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            IntentCode.NODE_GLOBAL_VROUTE,
+            // IntentCode.NODE_GLOBAL_VROUTE,
             IntentCode.NODE_GLOBAL_VDISTR,
             IntentCode.NODE_GLOBAL_VDISTR_LVL1,
             IntentCode.NODE_GLOBAL_VDISTR_LVL2,
@@ -347,7 +347,8 @@ public class VersalClockRouting {
                     if (getNodeStatus.apply(currNode) == NodeStatus.INUSE) {
                         startingPoints.add(curr);
                     } else {
-                        List<PIP> pips = curr.getPIPsBackToSource();
+                        // List<PIP> pips = curr.getPIPsBackToSource();
+                        List<PIP> pips = curr.getPIPsBackToSourceTemp();
                         allPIPs.addAll(pips);
                         for (PIP p : pips) {
                             startingPoints.add(p.getStartRouteNode());
@@ -359,17 +360,32 @@ public class VersalClockRouting {
                     crToVdist.put(cr, currBase);
                     continue nextClockRegion;
                 }
-                for (Wire w : curr.getWireConnections()) {
+                // for (Wire w : curr.getWireConnections()) {
+                //     // if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
+                //     // if (!allowedIntentCodes.contains(w.getIntentCode())) {
+                //     //     continue;
+                //     // }
+                //     if (w.getTile().getTileTypeEnum() == TileTypeEnum.INVALID_1_10 || !allowedIntentCodes.contains(w.getIntentCode())) {
+                //         continue;
+                //     }
+                //     Node n = Node.getNode(w);
+                //     if (visited.contains(n)) continue;
+                //     RouteNode rn = new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1);
+                //     rn.setCost(w.getTile().getManhattanDistance(crTarget));
+                //     q.add(rn);
+                //     visited.add(n);
+                // }
+                Node currNode = Node.getNode(curr);
+                for (Node downhill : currNode.getAllDownhillNodes()) {
                     // if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
-                    if (w.getTile().getTileTypeEnum() == TileTypeEnum.INVALID_1_10 || !allowedIntentCodes.contains(w.getIntentCode())) {
+                    if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
                         continue;
                     }
-                    Node n = Node.getNode(w);
-                    RouteNode rn = new RouteNode(n.getTile(), n.getWireIndex(), curr, curr.getLevel()+1);
-                    if (visited.contains(rn)) continue;
-                    rn.setCost(w.getTile().getManhattanDistance(crTarget));
+                    if (visited.contains(downhill)) continue;
+                    RouteNode rn = new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1);
+                    rn.setCost(downhill.getTile().getManhattanDistance(crTarget));
                     q.add(rn);
-                    visited.add(rn);
+                    visited.add(downhill);
                 }
             }
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
@@ -466,14 +482,6 @@ public class VersalClockRouting {
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + targetCR);
         }
         clk.getPIPs().addAll(allPIPs);
-        // Set<IntentCode> allICs = new HashSet<>();
-        // for (PIP pip: allPIPs) {
-        //     allICs.add(pip.getStartNode().getIntentCode());
-        //     allICs.add(pip.getEndNode().getIntentCode());
-        // }
-        // for (IntentCode ic: allICs) {
-        //     System.out.println(ic);
-        // }
         return distLines;
     }
 
@@ -682,8 +690,10 @@ public class VersalClockRouting {
 
         for (ClockRegion cr: vertDistLines.keySet()) {
             RouteNode vDistNode = vertDistLines.get(cr);
-            System.out.println(cr + " " + vDistNode.getName() + " " + vDistNode.getTile().getClockRegion());
+            System.out.println(cr + " " + vDistNode + " " + vDistNode.getTile().getClockRegion());
         }
+
+        check(clk, new ArrayList<RouteNode>(vertDistLines.values()));
 
         // TODO: 
         return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
@@ -856,5 +866,34 @@ public class VersalClockRouting {
         // Remove duplicates
         Set<PIP> uniquePIPs = new HashSet<>(clkNet.getPIPs());
         clkNet.setPIPs(uniquePIPs);
+    }
+
+    
+    // debug
+    private static void check(Net clk, List<RouteNode> rnodes) {
+        Node sourceNode = clk.getSource().getConnectedNode();
+        Map<Node, Node> reversedEdges = new HashMap<>();
+        Set<PIP> pips = new HashSet<>(clk.getPIPs());
+        for (PIP pip: pips) {
+            if (pip.isBidirectional() && pip.isReversed()) {
+                assert(!reversedEdges.containsKey(pip.getStartNode()));
+                reversedEdges.put(pip.getStartNode(), pip.getEndNode());
+            } else {
+                assert(!reversedEdges.containsKey(pip.getEndNode()));
+                reversedEdges.put(pip.getEndNode(), pip.getStartNode());
+            }
+        }
+        for (RouteNode rnode: rnodes) {
+            Node node = Node.getNode(rnode);
+            Node curr = node;
+            while (curr != null && !curr.equals(sourceNode)) {
+                curr = reversedEdges.get(curr);
+            }
+            if (curr == null) {
+                System.out.println("Node " + node + ": antenna");
+            } else {
+                System.out.println("Node " + node + ": connected");
+            }
+        }
     }
 }

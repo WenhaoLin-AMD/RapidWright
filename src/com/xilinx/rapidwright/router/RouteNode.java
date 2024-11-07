@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
 
 
 /**
@@ -360,6 +361,12 @@ public class RouteNode implements Comparable<RouteNode> {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
         while (curr.parent != null) {
+            {
+                if (curr.getName().equals("CLK_REBUF_VERT_VNOC_ACO_TILE_X30Y279/IF_WRAP_CLK_V_BOT_CLK_VDISTR_LEV2_21") && 
+                    curr.parent.getName().equals("CLK_REBUF_VERT_VNOC_BAO_TILE_X30Y183/CLK_CMT_MUX_3TO1_27_CLK_OUT")) {
+                        System.out.println("debug");
+                }
+            }
             for (Wire parentWire : Arrays.asList(curr.parent.getWiresInNode())) {
                 if (!parentWire.getTile().equals(curr.getTile()))
                     continue;
@@ -375,6 +382,43 @@ public class RouteNode implements Comparable<RouteNode> {
                         }
                     }
                 }
+            }
+            // assert(findPIP);
+            curr = curr.parent;
+        }
+        return pips;
+    }
+
+    public ArrayList<PIP> getPIPsBackToSourceTemp() {
+        ArrayList<PIP> pips = new ArrayList<>();
+        RouteNode curr = this;
+        while (curr.parent != null) {
+            // {
+            //     if (curr.getName().equals("CLK_REBUF_VERT_VNOC_ACO_TILE_X30Y279/IF_WRAP_CLK_V_BOT_CLK_VDISTR_LEV2_21") && 
+            //         curr.parent.getName().equals("CLK_REBUF_VERT_VNOC_BAO_TILE_X30Y183/CLK_CMT_MUX_3TO1_27_CLK_OUT")) {
+            //             System.out.println("debug");
+            //     }
+            // }
+            // for (Wire parentWire : Arrays.asList(curr.parent.getWiresInNode())) {
+            //     if (!parentWire.getTile().equals(curr.getTile()))
+            //         continue;
+            //     for (Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())) {
+            //         if (w1.getWireIndex() == curr.wire) {
+            //             if (w1.isEndPIPWire()) {
+            //                 PIP p = new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType());
+            //                 if (p.isBidirectional()) {
+            //                     p.setIsReversed(p.getStartWire().equals(w1));
+            //                 }
+            //                 pips.add(p);
+            //                 break;
+            //             }
+            //         }
+            //     }
+            // }
+            // assert(findPIP);
+            PIP pip = RouterHelper.findPIPbetweenNodes(Node.getNode(curr.parent), Node.getNode(curr));
+            if (pip != null) {
+                pips.add(pip);
             }
             curr = curr.parent;
         }
