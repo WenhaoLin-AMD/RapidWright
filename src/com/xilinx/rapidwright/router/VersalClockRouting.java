@@ -437,7 +437,8 @@ public class VersalClockRouting {
                 if (targetCR.equals(curr.getTile().getClockRegion()) && 
                     c == IntentCode.NODE_GLOBAL_GCLK &&
                     parent.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
-                    List<PIP> pips = parent.getPIPsBackToSource();
+                    // List<PIP> pips = parent.getPIPsBackToSource();
+                    List<PIP> pips = parent.getPIPsBackToSourceTemp();
                     for (PIP pip : pips) {
                         allPIPs.add(pip);
                         NodeStatus status = getNodeStatus.apply(pip.getStartNode());
@@ -696,7 +697,8 @@ public class VersalClockRouting {
         check(clk, new ArrayList<RouteNode>(vertDistLines.values()));
 
         // TODO: 
-        return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
+        Map<ClockRegion, RouteNode> horiDistLines = routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
+        return horiDistLines;
     }
 
     /**
