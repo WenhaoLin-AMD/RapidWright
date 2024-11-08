@@ -414,31 +414,53 @@ public class GlobalSignalRouting {
                 throw new RuntimeException("Unable to get INT tile for pin " + p);
             }
             Node intNode = intNodes.get(0);
+            List<Node> startNodes = new ArrayList<>();
 
-            outer: for (Node prev : intNode.getAllUphillNodes()) {
-                NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
-                if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
-                    continue;
+            if (intNode.getIntentCode() == IntentCode.NODE_IMUX) {
+                // This node drives a LUT input pin. Vivado reaches this pin in pattern: 
+                // NODE_GLOBAL_LEAF -> NODE_CLE_CNODE -> NODE_INODE -> NODE_IMUX
+                // Need to go one more step to let prevPrev be a NODE_GLOBAL_LEAF node.
+
+                // And, it seems that each NODE_INODE node is driven by only one NODE_CLE_CNODE node,
+                // but not each NODE_CLE_CNODE node can find a uphill NODE_GLOBAL_LEAF node,
+                // thus here I add all NODE_INODE nodes to ensure that we can find candidates.
+                Tile intTile = intNode.getTile();
+                for (Node uphill: intNode.getAllUphillNodes()) {
+                    if (uphill.getIntentCode() == IntentCode.NODE_INODE && uphill.getTile() == intTile) {
+                        startNodes.add(uphill);
+                    }
                 }
+            } else {
+                assert(intNode.getIntentCode() == IntentCode.NODE_CLE_CTRL || intNode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+                startNodes.add(intNode);
+            }
 
-                for (Node prevPrev : prev.getAllUphillNodes()) {
-                    if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
+            outer: for (Node startNode: startNodes) {
+                for (Node prev : startNode.getAllUphillNodes()) {
+                    NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
+                    if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
                         continue;
                     }
-
-                    NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
-                    if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
-                        continue;
-                    }
-
-                    if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
-                        lcbCandidates.clear();
+    
+                    for (Node prevPrev : prev.getAllUphillNodes()) {
+                        if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
+                            continue;
+                        }
+    
+                        NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
+                        if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
+                            continue;
+                        }
+    
+                        if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
+                            lcbCandidates.clear();
+                            lcbCandidates.add(prevPrev);
+                            break outer;
+                        }
+    
+                        assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
                         lcbCandidates.add(prevPrev);
-                        break outer;
                     }
-
-                    assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
-                    lcbCandidates.add(prevPrev);
                 }
             }
 

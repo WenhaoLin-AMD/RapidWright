@@ -670,6 +670,18 @@ public class VersalClockRouting {
         Queue<RouteNode> q = new LinkedList<>();
         
         Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
+        Set<IntentCode> allowedIntentCodes = EnumSet.of(
+            IntentCode.NODE_CLE_CNODE,
+            IntentCode.NODE_INTF_CNODE,
+            IntentCode.NODE_CLE_CTRL,
+            IntentCode.NODE_INTF_CTRL,
+            IntentCode.NODE_IRI,
+            IntentCode.NODE_INODE,
+            IntentCode.NODE_PINBOUNCE,
+            IntentCode.NODE_CLE_BNODE,
+            IntentCode.NODE_IMUX,
+            IntentCode.NODE_PINFEED
+        );
 
         RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
 
@@ -716,6 +728,7 @@ public class VersalClockRouting {
                     //     q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                     // }
                     for (Node downhill : currNode.getAllDownhillNodes()) {
+                        if (!allowedIntentCodes.contains(downhill.getIntentCode())) continue;
                         if (!visited.add(downhill)) continue;
                         if (used.contains(downhill)) continue;
                         // if (w.isRouteThru()) continue;
