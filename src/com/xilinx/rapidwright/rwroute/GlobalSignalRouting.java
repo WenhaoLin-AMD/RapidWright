@@ -257,9 +257,9 @@ public class GlobalSignalRouting {
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             ClockRegion centroid = findCentroid(clk, device);
 
-            // if (debug) {
-            //     System.out.println("centroid: " + centroid);
-            // }
+            if (debug) {
+                System.out.println("centroid: " + centroid);
+            }
 
             if (debug) {
                 centroid = device.getClockRegion(1, 3);
@@ -315,6 +315,57 @@ public class GlobalSignalRouting {
 
             Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
             clk.setPIPs(clkPIPsWithoutDuplication);
+
+            {
+                Map<Node, Node> reverseEdge = new HashMap<>();
+                // String debugNode = "RCLK_BRAM_CLKBUF_CORE_X39Y239/IF_HCLK_R_CLK_HDISTR21";
+
+                for (PIP pip: clk.getPIPs()) {
+                    Node startNode = pip.getStartNode();
+                    Node endNode = pip.getEndNode();
+                    if (pip.isBidirectional() && pip.isReversed()) {
+                        reverseEdge.put(startNode, endNode);
+                    } else {
+                        reverseEdge.put(endNode, startNode);
+                    }
+                }
+
+                Node source = clk.getSource().getConnectedNode();
+                Map<Node, Set<SitePinInst>> failedPins = new HashMap<>();
+                List<SitePinInst> successPins = new ArrayList<>();
+                int failedCnt = 0;
+                int successCnt = 0;
+
+                for (SitePinInst sinkPin: clk.getSinkPins()) {
+                    Node sink = sinkPin.getConnectedNode();
+                    Node curr = sink;
+                    // System.out.print(sinkPin + " ");
+                    while (!curr.equals(source)) {
+                        if (reverseEdge.get(curr) == null) {
+                            // System.out.print("null");
+                            failedPins.computeIfAbsent(curr, k -> new HashSet<>()).add(sinkPin);
+                            failedCnt ++;
+                            break;
+                        }
+                        curr = reverseEdge.get(curr);
+                    }
+                    if (curr.equals(source)) {
+                        successCnt ++;
+                        successPins.add(sinkPin);
+                    }
+                    // System.out.println();
+                }
+                System.out.println("---------------");
+                System.out.println(failedCnt + "/" + clk.getSinkPins().size() + " pins failed");
+                // for (SitePinInst failedPin: failedPins.keySet()) {
+                //     System.out.println(failedPin + " " + failedPins.get(failedPin));
+                // }
+                System.out.println("---------------");
+                System.out.println(successCnt + "/" + clk.getSinkPins().size() + " pins succeeded");
+                // for (SitePinInst successPin: successPins) {
+                //     System.out.println(successPin);
+                // }
+            }
         }
     }
 
