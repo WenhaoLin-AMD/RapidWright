@@ -256,6 +256,7 @@ public class GlobalSignalRouting {
             boolean debug = true;
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             ClockRegion centroid = findCentroid(clk, device);
+            Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
 
             if (debug) {
                 System.out.println("centroid: " + centroid);
@@ -283,30 +284,33 @@ public class GlobalSignalRouting {
                 System.out.println("centroidHRouteNode: " + centroidHRouteNode + " " + centroidHRouteNode.getTile().getClockRegion());
             }
             
-            RouteNode vrouteUp = null;
-            RouteNode vrouteDown;
-            // Two VROUTEs going up and down
-            ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-            if (aboveCentroid != null) {
-                vrouteUp = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
-                if (debug) {
-                    System.out.println("vrouteUp: " + vrouteUp + " " + vrouteUp.getTile().getClockRegion());
-                }
-            }
-            vrouteDown = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+            // RouteNode vrouteUp = null;
+            // RouteNode vrouteDown;
+            // // Two VROUTEs going up and down
+            // ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+            // if (aboveCentroid != null) {
+            //     vrouteUp = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+            //     if (debug) {
+            //         System.out.println("vrouteUp: " + vrouteUp + " " + vrouteUp.getTile().getClockRegion());
+            //     }
+            // }
+            // vrouteDown = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 
-            if (debug) {
-                System.out.println("vrouteDown: " + vrouteDown + " " + vrouteDown.getTile().getClockRegion());
-            }
+            // if (debug) {
+            //     System.out.println("vrouteDown: " + vrouteDown + " " + vrouteDown.getTile().getClockRegion());
+            // }
 
-            Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
-            if (aboveCentroid != null) {
-                Map<ClockRegion, RouteNode> upLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
-                if (!upLines.isEmpty()) upDownDistLines.putAll(upLines);
-            }
+            
+            // if (aboveCentroid != null) {
+            //     Map<ClockRegion, RouteNode> upLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+            //     if (!upLines.isEmpty()) upDownDistLines.putAll(upLines);
+            // }
 
-            Map<ClockRegion, RouteNode> downLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-            if (!downLines.isEmpty()) upDownDistLines.putAll(downLines);
+            // Map<ClockRegion, RouteNode> downLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            // if (!downLines.isEmpty()) upDownDistLines.putAll(downLines);
+
+            RouteNode vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, true, false);
+            upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
 
             Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
             VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());

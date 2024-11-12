@@ -165,7 +165,7 @@ public class VersalClockRouting {
                 if (parent != null) {
                     Node parentNode = Node.getNode(parent);
                     if (parentNode.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
-                        downhill.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+                        currNode.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                         // Disallow ability to go from VROUTE back to HROUTE
                         continue;
                     }
@@ -414,11 +414,11 @@ public class VersalClockRouting {
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
                 // visited.add(curr);
-                IntentCode c = curr.getIntentCode();
-                ClockRegion currCR = curr.getTile().getClockRegion();
+                Node currNode = Node.getNode(curr);
+                IntentCode c = currNode.getIntentCode();
+                ClockRegion currCR = currNode.getTile().getClockRegion();
                 if (currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
                     // Only consider base wires
-                    Node currNode = Node.getNode(curr);
                     if (getNodeStatus.apply(currNode) == NodeStatus.INUSE) {
                         startingPoints.add(curr);
                     } else {
@@ -450,7 +450,7 @@ public class VersalClockRouting {
                 //     q.add(rn);
                 //     visited.add(n);
                 // }
-                Node currNode = Node.getNode(curr);
+                // Node currNode = Node.getNode(curr);
                 for (Node downhill : currNode.getAllDownhillNodes()) {
                     // if (w.getIntentCode() != IntentCode.NODE_GLOBAL_VDISTR) continue;
                     if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
@@ -790,12 +790,14 @@ public class VersalClockRouting {
         //     vertDistLines.put(cr, vDistLine);
         // }
 
-        for (ClockRegion cr: vertDistLines.keySet()) {
-            RouteNode vDistNode = vertDistLines.get(cr);
-            System.out.println(cr + " " + vDistNode + " " + vDistNode.getTile().getClockRegion());
-        }
+        // for (ClockRegion cr: vertDistLines.keySet()) {
+        //     RouteNode vDistNode = vertDistLines.get(cr);
+        //     System.out.println(cr + " " + vDistNode + " " + vDistNode.getTile().getClockRegion());
+        // }
 
         // check(clk, new ArrayList<RouteNode>(vertDistLines.values()));
+
+        // System.out.println(clockRegions);
 
         // TODO: 
         Map<ClockRegion, RouteNode> horiDistLines = routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
