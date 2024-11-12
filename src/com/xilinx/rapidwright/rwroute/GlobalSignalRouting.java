@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -253,63 +254,44 @@ public class GlobalSignalRouting {
             clk.setPIPs(clkPIPsWithoutDuplication);
         }
         else {
-            boolean debug = true;
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-            ClockRegion centroid = findCentroid(clk, device);
             Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
+            SitePinInst source = clk.getSource();
+            SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
+            ClockRegion centroid = null;
+            RouteNode vroute = null;
+            boolean debug = true;
 
-            if (debug) {
-                System.out.println("centroid: " + centroid);
+            if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
+                assert(source.getTile().getTileYCoordinate() == 0);
+                centroid = device.getClockRegion(1, findCentroid(clk, device).getColumn());
+    
+                List<ClockRegion> upClockRegions = new ArrayList<>();
+                List<ClockRegion> downClockRegions = new ArrayList<>();
+                // divides clock regions into two groups
+                divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+    
+                RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+    
+                if (debug) {
+                    System.out.println("clkRoutingLine: " + clkRoutingLine + " " + clkRoutingLine.getTile().getClockRegion());
+                }
+    
+                RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+    
+                if (debug) {
+                    System.out.println("centroidHRouteNode: " + centroidHRouteNode + " " + centroidHRouteNode.getTile().getClockRegion());
+                }
+    
+                vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, true, false);
+            } else if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
+                centroid = source.getTile().getClockRegion();
+                RouteNode sourceRouteNode = new RouteNode(source.getConnectedNode());
+                vroute = VersalClockRouting.routeToCentroid(clk, sourceRouteNode, centroid, true, false);
+            } else {
+                throw new RuntimeException("RWRoute hasn't supported routing a clock net with source type " + sourceTypeEnum + " yet.");
             }
 
-            if (debug) {
-                centroid = device.getClockRegion(1, 3);
-                System.out.println("centroid: " + centroid);
-            }
-
-            List<ClockRegion> upClockRegions = new ArrayList<>();
-            List<ClockRegion> downClockRegions = new ArrayList<>();
-            // divides clock regions into two groups
-            divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
-
-            RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-
-            if (debug) {
-                System.out.println("clkRoutingLine: " + clkRoutingLine + " " + clkRoutingLine.getTile().getClockRegion());
-            }
-
-            RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-
-            if (debug) {
-                System.out.println("centroidHRouteNode: " + centroidHRouteNode + " " + centroidHRouteNode.getTile().getClockRegion());
-            }
-            
-            // RouteNode vrouteUp = null;
-            // RouteNode vrouteDown;
-            // // Two VROUTEs going up and down
-            // ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-            // if (aboveCentroid != null) {
-            //     vrouteUp = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
-            //     if (debug) {
-            //         System.out.println("vrouteUp: " + vrouteUp + " " + vrouteUp.getTile().getClockRegion());
-            //     }
-            // }
-            // vrouteDown = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
-
-            // if (debug) {
-            //     System.out.println("vrouteDown: " + vrouteDown + " " + vrouteDown.getTile().getClockRegion());
-            // }
-
-            
-            // if (aboveCentroid != null) {
-            //     Map<ClockRegion, RouteNode> upLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
-            //     if (!upLines.isEmpty()) upDownDistLines.putAll(upLines);
-            // }
-
-            // Map<ClockRegion, RouteNode> downLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-            // if (!downLines.isEmpty()) upDownDistLines.putAll(downLines);
-
-            RouteNode vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, true, false);
             upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
 
             Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
@@ -334,7 +316,7 @@ public class GlobalSignalRouting {
                     }
                 }
 
-                Node source = clk.getSource().getConnectedNode();
+                Node sourceNode = clk.getSource().getConnectedNode();
                 Map<Node, Set<SitePinInst>> failedPins = new HashMap<>();
                 List<SitePinInst> successPins = new ArrayList<>();
                 int failedCnt = 0;
@@ -344,7 +326,7 @@ public class GlobalSignalRouting {
                     Node sink = sinkPin.getConnectedNode();
                     Node curr = sink;
                     // System.out.print(sinkPin + " ");
-                    while (!curr.equals(source)) {
+                    while (!curr.equals(sourceNode)) {
                         if (reverseEdge.get(curr) == null) {
                             // System.out.print("null");
                             failedPins.computeIfAbsent(curr, k -> new HashSet<>()).add(sinkPin);
@@ -353,7 +335,7 @@ public class GlobalSignalRouting {
                         }
                         curr = reverseEdge.get(curr);
                     }
-                    if (curr.equals(source)) {
+                    if (curr.equals(sourceNode)) {
                         successCnt ++;
                         successPins.add(sinkPin);
                     }

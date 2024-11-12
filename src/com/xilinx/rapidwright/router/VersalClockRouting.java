@@ -93,6 +93,7 @@ public class VersalClockRouting {
         startingRouteNode.setParent(null);
         q.add(startingRouteNode);
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
+            IntentCode.NODE_GLOBAL_BUFG,
             IntentCode.NODE_GLOBAL_GCLK,
             IntentCode.NODE_GLOBAL_HROUTE_HSR,
             IntentCode.NODE_GLOBAL_VROUTE,
