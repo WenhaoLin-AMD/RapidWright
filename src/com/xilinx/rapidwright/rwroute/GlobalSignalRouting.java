@@ -255,26 +255,39 @@ public class GlobalSignalRouting {
         }
         else {
             // Clock routing on Versal devices
+            // TODO: Tile.getWireConnections(int wire) is not working correctly on Versal devices,
+            // so the below clock routing flow goes in the "node way", which means we use Node.getAllDownhillNodes() to 
+            // go downhill instead of Tile.getWireConnections(int wire). This may lead to worse runtime.
+
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
             SitePinInst source = clk.getSource();
             SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
-            ClockRegion centroid = null;
+            // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
+            // However, we can see that Vivado only use one VROUTE node in the centroid clock region for versal clock routing,
+            // and reach the above and below clock regions by VDISTR nodes.
             RouteNode vroute = null;
 
+            // In FPGA '24 routing contest benchmarks, we found that there are only two types of source sites for the clock nets: BUFGCE and BUFG_FABRIC.
             if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
-                centroid = source.getTile().getClockRegion();
+                // These source sites are located in the middle of the device. The path from the output pin to VROUTE matches the following pattern:
+                // NODE_GLOBAL_BUFG (the output node with a suffix "_O") -> 
+                // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") -> 
+                // NODE_GLOBAL_GCLK ->
+                // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
+
+                // Notice that Vivado always use the above VROUTE node, there is no need to find a centroid clock region to route to.
                 RouteNode sourceRouteNode = new RouteNode(source.getConnectedNode());
-                vroute = VersalClockRouting.routeToCentroid(clk, sourceRouteNode, centroid, true, false);
+                vroute = VersalClockRouting.routeToCentroid(clk, sourceRouteNode, source.getTile().getClockRegion(), true, false);
             } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
+                // Most clock nets in FPGA '24 benchmarks have this type of source site.
+                // These source sites are located in the bottom of the device (Y=0). The path from the output pin to VROUTE matches the following pattern:
+                // NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
+                // which is similar to US/US+ clock routing.
+                // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
+                // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
                 assert(source.getTile().getTileYCoordinate() == 0);
-                centroid = device.getClockRegion(1, findCentroid(clk, device).getColumn());
-    
-                List<ClockRegion> upClockRegions = new ArrayList<>();
-                List<ClockRegion> downClockRegions = new ArrayList<>();
-                // divides clock regions into two groups
-                divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
-    
+                ClockRegion centroid = device.getClockRegion(1, findCentroid(clk, device).getColumn());    
                 RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
                 RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
                 vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, true, false);

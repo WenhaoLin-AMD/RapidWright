@@ -36,9 +36,9 @@ import java.util.function.Predicate;
 
 /**
  * A collection of utility methods for routing clocks on
- * the UltraScale architecture.
+ * the Versal architecture.
  *
- * Created on: Feb 1, 2018
+ * Created on: Nov 1, 2024
  */
 public class VersalClockRouting {
 
@@ -49,16 +49,11 @@ public class VersalClockRouting {
         while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             Node currNode = Node.getNode(curr);
-            // IntentCode c = curr.getIntentCode();
             IntentCode c = currNode.getIntentCode();
             if (c == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
-                // clk.getPIPs().addAll(curr.getPIPsBackToSource());
                 clk.getPIPs().addAll(curr.getPIPsBackToSourceByNodes());
                 return curr;
             }
-            // for (Wire w : curr.getWireConnections()) {
-            //     q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
-            // }
             for (Node downhill: currNode.getAllDownhillNodes()) {
                 q.add(new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1));
             }
@@ -78,6 +73,7 @@ public class VersalClockRouting {
     public static RouteNode routeToCentroid(Net clk, RouteNode clkRoutingLine, ClockRegion centroid) {
         return routeToCentroid(clk, clkRoutingLine, centroid, false, false);
     }
+
     /**
      * Routes a clock from a routing track to a transition point where the clock.
      * fans out and transitions from clock routing tracks to clock distribution.
@@ -89,7 +85,6 @@ public class VersalClockRouting {
      */
     public static RouteNode routeToCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean adjusted, boolean findCentroidHroute) {
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
-        // HashSet<RouteNode> visited = new HashSet<>();
         startingRouteNode.setParent(null);
         q.add(startingRouteNode);
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
@@ -101,10 +96,12 @@ public class VersalClockRouting {
         );
         // Tile approxTarget = clockRegion.getApproximateCenter();
         int watchDog = 10000000;
-
-        RouteNode centroidHRouteNode;
-
+        RouteNode centroidHRouteNode = null;
         Set<Node> visited = new HashSet<>();
+
+        // In Vivado solutions, we can always find the pattern:
+        // ... -> NODE_GLOBAL_GCLK -> NODE_GLOBAL_VROUTE -> NODE_GLOBAL_VDISTR_LVL2 -> ...
+        // and this is how we locate the VROUTE node
 
         while (!q.isEmpty()) {
             RouteNode curr = q.poll();
@@ -121,7 +118,6 @@ public class VersalClockRouting {
                     if (downhill.getIntentCode()     == IntentCode.NODE_GLOBAL_VDISTR_LVL2 &&
                        currNode.getIntentCode()   == IntentCode.NODE_GLOBAL_GCLK &&
                        parentNode.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
-                    //    clockRegion.equals(w.getTile().getClockRegion()) &&
                        clockRegion.equals(currNode.getTile().getClockRegion()) &&
                        clockRegion.equals(parentNode.getTile().getClockRegion()) &&
                        parentNode.getWireName().contains("BOT")) {
@@ -152,6 +148,8 @@ public class VersalClockRouting {
                 if (visited.contains(downhill)) continue;
                 RouteNode rn = new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1);
                 
+                // The clockRegion.getApproximateCenter() may return an INVALID_* tile with huge coordinates.
+                // Here we use the manhatten distance to the target clock region as the cost.
                 ClockRegion rnClockRegion = rn.getTile().getClockRegion();
                 int cost = Math.abs(rnClockRegion.getColumn() - clockRegion.getColumn()) + Math.abs(rnClockRegion.getRow() - clockRegion.getRow());
                 rn.setCost(cost);
@@ -578,7 +576,6 @@ public class VersalClockRouting {
                     Node currNode = Node.getNode(curr);
                     if (targetNode.equals(currNode)) {
                         boolean inuse = false;
-                        // for (PIP pip : curr.getPIPsBackToSource()) {
                         for (PIP pip : curr.getPIPsBackToSourceByNodes()) {
                             if (inuse) {
                                 assert(getNodeStatus.apply(pip.getStartNode()) == NodeStatus.INUSE);
@@ -602,6 +599,7 @@ public class VersalClockRouting {
                         if (!allowedIntentCodes.contains(downhill.getIntentCode())) continue;
                         if (!visited.add(downhill)) continue;
                         if (used.contains(downhill)) continue;
+                        // have to allow those routethru-s NODE_IRI -> *
                         if (routeThruHelper.isRouteThru(currNode, downhill) && downhill.getIntentCode() != IntentCode.NODE_IRI) continue;
                         if (isNodeUnavailable.test(downhill)) continue;
                         q.add(new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1));
@@ -632,7 +630,11 @@ public class VersalClockRouting {
                                                                      Collection<ClockRegion> clockRegions,
                                                                      boolean down,
                                                                      Function<Node, NodeStatus> getNodeStatus) {
+        // First step: map each clock region to a VDISTR node. 
+        // The clock region of this VDISTR node should be in the same column of the centroid (X) and the same row of the target clock region (Y). 
         Map<ClockRegion, RouteNode> vertDistLines = routeVrouteToVerticalDistributionLines(clk, vroute, clockRegions, getNodeStatus);
+
+        // Second step: start from the VDISTR node and try to find a HDISTR node in the target clock region.
         Map<ClockRegion, RouteNode> horiDistLines = routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
         return horiDistLines;
     }
