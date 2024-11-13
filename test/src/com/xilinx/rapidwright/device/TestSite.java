@@ -22,6 +22,11 @@
 
 package com.xilinx.rapidwright.device;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -35,5 +40,41 @@ public class TestSite {
         Device device = Device.getDevice(deviceName);
         Site site = device.getSite(siteName);
         Assertions.assertEquals(intTileName, site.getIntTile().getName());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "xcvp1002",
+        "xcvp1202",
+        "xcvp1502"
+    })
+    public void testClockSitesOnVersal(String deviceName) {
+        Device device = Device.getDevice(deviceName);
+        assertNotNull(device);
+        for (SiteTypeEnum siteTypeEnum: new SiteTypeEnum[] {SiteTypeEnum.BUFGCE, SiteTypeEnum.BUFGCTRL, SiteTypeEnum.BUFG}) {
+            for (Site site: device.getAllSitesOfType(siteTypeEnum)) {
+                assertTrue(site.getTile().getTileYCoordinate() == 0);
+            }
+        }
+
+        for (Site site: device.getAllSitesOfType(SiteTypeEnum.BUFG_FABRIC)) {
+            Node node = site.getConnectedNode("O");
+            assertTrue(node.getIntentCode() == IntentCode.NODE_GLOBAL_BUFG);
+            List<Node> downhills = node.getAllDownhillNodes();
+            assertTrue(downhills.size() == 1);
+            node = downhills.get(0);
+
+            assertTrue(node.getIntentCode() == IntentCode.NODE_GLOBAL_BUFG);
+            downhills = node.getAllDownhillNodes();
+            assertTrue(downhills.size() == 1);
+            node = downhills.get(0);
+
+            assertTrue(node.getIntentCode() == IntentCode.NODE_GLOBAL_GCLK);
+            downhills = node.getAllDownhillNodes();
+            assertTrue(downhills.size() == 1);
+            node = downhills.get(0);
+
+            assertTrue(node.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE);
+        }
     }
 }
