@@ -291,6 +291,7 @@ public class GlobalSignalRouting {
                 assert(source.getTile().getTileYCoordinate() == 0);
                 // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
                 int centroidX = sourceRouteNode.getTile().getClockRegion().getColumn();
+                // VROUTE nodes are in the clock region where X is odd.
                 if (centroidX % 2 == 0) centroidX -= 1;
                 if (centroidX <= 0)     centroidX = 1;
 
