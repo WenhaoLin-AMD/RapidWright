@@ -254,15 +254,19 @@ public class GlobalSignalRouting {
             clk.setPIPs(clkPIPsWithoutDuplication);
         }
         else {
+            // Clock routing on Versal devices
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
             SitePinInst source = clk.getSource();
             SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
             ClockRegion centroid = null;
             RouteNode vroute = null;
-            boolean debug = true;
 
-            if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
+            if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
+                centroid = source.getTile().getClockRegion();
+                RouteNode sourceRouteNode = new RouteNode(source.getConnectedNode());
+                vroute = VersalClockRouting.routeToCentroid(clk, sourceRouteNode, centroid, true, false);
+            } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
                 assert(source.getTile().getTileYCoordinate() == 0);
                 centroid = device.getClockRegion(1, findCentroid(clk, device).getColumn());
     
@@ -272,22 +276,8 @@ public class GlobalSignalRouting {
                 divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
     
                 RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-    
-                if (debug) {
-                    System.out.println("clkRoutingLine: " + clkRoutingLine + " " + clkRoutingLine.getTile().getClockRegion());
-                }
-    
                 RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-    
-                if (debug) {
-                    System.out.println("centroidHRouteNode: " + centroidHRouteNode + " " + centroidHRouteNode.getTile().getClockRegion());
-                }
-    
                 vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, true, false);
-            } else if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
-                centroid = source.getTile().getClockRegion();
-                RouteNode sourceRouteNode = new RouteNode(source.getConnectedNode());
-                vroute = VersalClockRouting.routeToCentroid(clk, sourceRouteNode, centroid, true, false);
             } else {
                 throw new RuntimeException("RWRoute hasn't supported routing a clock net with source type " + sourceTypeEnum + " yet.");
             }
