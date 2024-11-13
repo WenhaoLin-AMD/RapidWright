@@ -56,18 +56,6 @@ public class VersalClockRouting {
     }
 
     /**
-     * Routes a clock from a routing track to a transition point called the centroid
-     * where the clock fans out and transitions from clock routing tracks to clock distribution
-     * tracks
-     * @param clk The current clock net to contribute routing
-     * @param clkRoutingLine The intermediate start point of the clock route
-     * @param centroid ClockRegion/FSR considered to be the centroid target
-     */
-    public static RouteNode routeToCentroid(Net clk, RouteNode clkRoutingLine, ClockRegion centroid) {
-        return routeToCentroid(clk, clkRoutingLine, centroid, false, false);
-    }
-
-    /**
      * Routes a clock from a routing track to a transition point where the clock.
      * fans out and transitions from clock routing tracks to clock distribution.
      * @param clk The current clock net to contribute routing.
@@ -158,103 +146,6 @@ public class VersalClockRouting {
     }
 
     /**
-     * Routes a clock from a routing track to a given transition point called the centroid
-     * @param clk The clock net to be routed
-     * @param startingRouteNode The starting routing track
-     * @param centroid The given centroid node
-     * @return
-     */
-    public static RouteNode routeToCentroidNode(Net clk, RouteNode startingRouteNode, Node centroid) {
-        Queue<RouteNode> q = RouteNode.createPriorityQueue();
-        HashSet<RouteNode> visited = new HashSet<>();
-
-        startingRouteNode.setParent(null);
-        q.add(startingRouteNode);
-        Tile tileTarget = centroid.getTile();
-
-        int watchDog = 10000;
-        while (!q.isEmpty()) {
-            RouteNode curr = q.poll();
-            visited.add(curr);
-
-            for (Wire w : curr.getWireConnections()) {
-                // Only using clk routing network to reach centroid
-                if (!w.getIntentCode().isUltraScaleClocking()) continue;
-
-                if (w.getWireName().equals(centroid.getWireName())
-                        && w.getTile().equals(centroid.getTile())) {
-                    // curr is not the target, build the target
-                    RouteNode routeNodeTarget = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-                    clk.getPIPs().addAll(routeNodeTarget.getPIPsBackToSource());
-                    return routeNodeTarget;
-                }
-
-                RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
-                if (visited.contains(rn)) continue;
-                // using column & row based distance is more accurate than tile x/y coordinate based distance
-                int md = Math.abs(rn.getTile().getColumn() - tileTarget.getColumn()) + Math.abs(rn.getTile().getRow() - tileTarget.getRow());
-                rn.setCost(md);
-                q.add(rn);
-            }
-            if (watchDog-- == 0) {
-                throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + "\n       to the given centroid: " + centroid
-                                            + ".\n       Please check if BUFGCE is correctly placed in line with the reference.");
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Routes the centroid route track to a vertical distribution track to realize
-     * the centroid and root of the clock.
-     * @param clk Clock net to route
-     * @param centroidRouteLine The current routing track found in the centroid
-     * @return The vertical distribution track for the centroid clock region
-     */
-    public static RouteNode transitionCentroidToDistributionLine(Net clk, RouteNode centroidRouteLine) {
-        centroidRouteLine.setParent(null);
-        if (centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
-            return centroidRouteLine;
-        }
-        ClockRegion currCR = centroidRouteLine.getTile().getClockRegion();
-        return transitionCentroidToDistributionLine(clk, centroidRouteLine, currCR);
-    }
-
-    public static RouteNode transitionCentroidToVerticalDistributionLine(Net clk, RouteNode centroidRouteLine, boolean down) {
-        centroidRouteLine.setParent(null);
-        if (centroidRouteLine.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
-            return centroidRouteLine;
-        }
-
-        ClockRegion currCR = centroidRouteLine.getTile().getClockRegion();
-        if (down && currCR.getRow() > 0) {
-            currCR = currCR.getNeighborClockRegion(-1, 0);
-        }
-        return transitionCentroidToDistributionLine(clk, centroidRouteLine, currCR);
-    }
-
-    public static RouteNode transitionCentroidToDistributionLine(Net clk, RouteNode centroidRouteLine, ClockRegion cr) {
-        Queue<RouteNode> q = new LinkedList<>();
-        q.add(centroidRouteLine);
-        int watchDog = 100000;
-        while (!q.isEmpty()) {
-            RouteNode curr = q.poll();
-            IntentCode c = curr.getIntentCode();
-            if (curr.getTile().getClockRegion().equals(cr) && c == IntentCode.NODE_GLOBAL_VDISTR) {
-                clk.getPIPs().addAll(curr.getPIPsBackToSource());
-                return curr;
-            }
-            for (Wire w : curr.getWireConnections()) {
-                // Stay in this clock region to transition from
-                if (!w.getIntentCode().isVersalClocking()) continue;
-                q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
-            }
-            if (watchDog-- == 0) break;
-        }
-        return null;
-    }
-
-    /**
      * Routes the vertical distribution path and generates a map between each target clock region and the vertical distribution line to
      * start from.
      * @param clk The clock net.
@@ -319,9 +210,9 @@ public class VersalClockRouting {
     }
 
     public static Map<ClockRegion, RouteNode> routeVrouteToVerticalDistributionLines(Net clk,
-                                                                                       RouteNode vroute,
-                                                                                       Collection<ClockRegion> clockRegions,
-                                                                                       Function<Node, NodeStatus> getNodeStatus) {
+                                                                                     RouteNode vroute,
+                                                                                     Collection<ClockRegion> clockRegions,
+                                                                                     Function<Node, NodeStatus> getNodeStatus) {
         Map<ClockRegion, RouteNode> crToVdist = new HashMap<>();
         vroute.setParent(null);
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
@@ -330,6 +221,7 @@ public class VersalClockRouting {
         Set<RouteNode> startingPoints = new HashSet<>();
         startingPoints.add(vroute);
         assert(vroute.getParent() == null);
+        // Pattern: NODE_GLOBAL_VROUTE -> ... -> NODE_GLOBAL_VDISTR_LVL2 -> ... -> NODE_GLOBAL_VDISTR_LVL1 -> ... -> NODE_GLOBAL_VDISTR
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
             // IntentCode.NODE_GLOBAL_VROUTE,
             IntentCode.NODE_GLOBAL_VDISTR,
@@ -389,7 +281,8 @@ public class VersalClockRouting {
      * Routes from a vertical distribution centroid to destination horizontal distribution lines
      * in the clock regions provided.
      * @param clk The current clock net
-     * @param crMap A map that provides a RouteNode reference for each ClockRegion
+     * @param vertDistLines A map of target clock regions and their respective vertical distribution lines
+     * @param clockRegions target clock regions
      * @return The List of nodes from the centroid to the horizontal distribution line.
      */
     public static Map<ClockRegion, RouteNode> routeVerticalToHorizontalDistributionLines(Net clk,
@@ -459,6 +352,7 @@ public class VersalClockRouting {
     /**
      * Routes from distribution lines to the leaf clock buffers (LCBs)
      * @param clk The current clock net
+     * @param distLines A map of target clock regions and their respective horizontal distribution lines
      * @param lcbTargets The target LCB nodes to route the clock
      */
     public static void routeDistributionToLCBs(Net clk, Map<ClockRegion, RouteNode> distLines, Set<RouteNode> lcbTargets) {

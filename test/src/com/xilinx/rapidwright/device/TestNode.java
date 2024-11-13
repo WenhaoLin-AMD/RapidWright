@@ -22,6 +22,8 @@
 
 package com.xilinx.rapidwright.device;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.HashSet;
@@ -200,6 +202,28 @@ public class TestNode {
                 Assertions.assertTrue(pip.isReversed());
             } else {
                 Assertions.assertFalse(pip.isReversed());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1002",
+            "xcvp1202",
+            "xcvp1502"
+    })
+    public void testCoordinatesOfVrouteNodesOnVersalDevices(String deviceName) {
+        Device device = Device.getDevice(deviceName);
+        for (Tile[] tiles: device.getTiles()) {
+            for (Tile tile: tiles) {
+                for (String wireName: tile.getWireNames()) {
+                    Node node = Node.getNode(tile, wireName);
+                    if (node == null || node.getIntentCode() != IntentCode.NODE_GLOBAL_VROUTE) continue;
+                    ClockRegion cr = node.getTile().getClockRegion();
+                    int x = cr.getColumn();
+                    int y = cr.getRow();
+                    assertTrue((x == 0 && y > 1) || x % 2 == 1);
+                }
             }
         }
     }
