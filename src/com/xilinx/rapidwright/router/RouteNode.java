@@ -377,7 +377,6 @@ public class RouteNode implements Comparable<RouteNode> {
                     }
                 }
             }
-            // assert(findPIP);
             curr = curr.parent;
         }
         return pips;
